@@ -1,3 +1,4 @@
+//go:build benchmark
 // +build benchmark
 
 package io
@@ -23,7 +24,6 @@ const (
 	conc = 1000              // concurrent client count
 )
 
-//
 type TestHandler struct {
 	component.Base
 	metrics int32

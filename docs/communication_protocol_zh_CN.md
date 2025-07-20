@@ -23,11 +23,11 @@ package分为header和body两部分。header描述package包的类型和包的�
 ![nano package](images/packet-format.png)
 
 * type - package类型，1个byte，取值如下。
-	- 0x01: 客户端到服务器的握手请求以及服务器到客户端的握手响应
-	- 0x02: 客户端到服务器的握手ack
-	- 0x03: 心跳包
-	- 0x04: 数据包
-	- 0x05: 服务器主动断开连接通知
+    - 0x01: 客户端到服务器的握手请求以及服务器到客户端的握手响应
+    - 0x02: 客户端到服务器的握手ack
+    - 0x03: 心跳包
+    - 0x04: 数据包
+    - 0x05: 服务器主动断开连接通知
 * length - body内容长度，3个byte的大端整数，因此最大的包长度为2^24个byte。
 * body - 二进制的传输内容。
 
@@ -42,7 +42,6 @@ package分为header和body两部分。header描述package包的类型和包的�
 
 握手请求：
 
-
 ```javascript
 {
   "sys": {
@@ -56,7 +55,7 @@ package分为header和body两部分。header描述package包的类型和包的�
 ```
 
 * sys.version - 客户端的版本号。每个客户端SDK的每一个版本都有一个固定的版本号。在握手阶段客户端将该版本
-号上传给服务器，服务器可以由此来判断当前客户端是否合适与服务器通讯。
+  号上传给服务器，服务器可以由此来判断当前客户端是否合适与服务器通讯。
 * sys.type - 客户端的类型。可以通过客户端类型和版本号一起来确定客户端是否合适。
 
 握手响应：
@@ -75,7 +74,7 @@ package分为header和body两部分。header描述package包的类型和包的�
 ```
 
 * code - 握手响应的状态码。目前的取值：200代表成功，500为处理用户自定义握手流程时失败，501为客户端版
-本号不符合要求。
+  本号不符合要求。
 * sys.heartbeat - 可选，心跳时间间隔，单位为秒，没指定表示不需要心跳。
 * dict - 可选，route字段压缩的映射表，没指定表示没有字典压缩。
 * protos - 可选，protobuf压缩的数据定义，没有表示没有protobuf压缩。
@@ -123,7 +122,8 @@ message id为空，对于客户端请求的响应，route为空，因此message�
 ![Message Head](images/message-header.png)
 
 从上图可以看出，Nano消息头是可变的，会根据具体的消息类型和内容而改变。其中：
-* flag位是必须的，占用一个byte，它决定了后面的消息类型和内容的格式; 
+
+* flag位是必须的，占用一个byte，它决定了后面的消息类型和内容的格式;
 * message id和route则是可选的。其中message id采用[varints 128变长编码](https://developers.google.com/protocol-buffers/docs/encoding#varints)方式，根据值的大小，长度在0～5byte之间。route则根据消息类型以及内容的大小，长度在0～255byte之间。
 
 ### 标志位(flag)
@@ -133,8 +133,9 @@ flag占用message头的第一个byte，其内容如下
 ![flag](images/message-flag.png)
 
 现在只用到了其中的4个bit，这四个bit包括两部分，占用3个bit的message type字段和占用1个bit的route标识，其中：
+
 * message type用来标识消息类型,范围为0～7，现在消息共有四类，request，notify，response，push，值的范围
-是0～3。不同的消息类型有着不同的消息内容，下面会有详细分析。
+  是0～3。不同的消息类型有着不同的消息内容，下面会有详细分析。
 * 最后一位的route表示route是否压缩，影响route字段的长度。
 
 这两部分之间相互独立，互不影响。
@@ -156,9 +157,11 @@ route字段的编码会依赖flag的这一位，其格式如下图:
 ![Message Type](images/route-compre.png)
 
 上图是不同的flag标志对应的route字段的内容：
+
 * flag的最后一位为1时，后面跟的是一个uInt16表示的route字典编号，需要通过查询字典来获取route;
 * flag最后一位为0是，后面route则由一个uInt8的byte，用来表示route的字节长度。之后是通过utf8编码后的route字
-符串，其长度就是前面一位byte的uInt8的值，因此route的长度最大支持256B。
+  符串，其长度就是前面一位byte的uInt8的值，因此route的长度最大支持256B。
+
 ## Summary
 
 在本部分，介绍了Nano提供的hybridconnector的线上协议，包括package层和message层。当用户使用nano作为网络层库

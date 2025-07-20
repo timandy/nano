@@ -3,7 +3,7 @@
 Nano's binary protocol can be divided into two layers: package layer and message layer. Message
 layer works on route compression and protobuf/json encoding/decoding, and the result from message
 layer will be passed to the package layer. The package layer provides a series of mechanisms
-including  handshake, heartbeat and byte-stream-based message encoding/decoding. The result from
+including handshake, heartbeat and byte-stream-based message encoding/decoding. The result from
 package layer can be transmitted on tcp or WebSocket. Both of the message layer and package layer
 can be replaced independently since neither of them relies on each other directly.
 
@@ -49,13 +49,22 @@ A handshake request is shown as follows:
 
 ```javascript
 {
-  "sys": {
-    "version": "1.1.1",
-    "type": "js-websocket"
-  },
-  "user": {
-    // Any customized request data
-  }
+    "sys"
+:
+    {
+        "version"
+    :
+        "1.1.1",
+                "type"
+    :
+        "js-websocket"
+    }
+,
+    "user"
+:
+    {
+        // Any customized request data
+    }
 }
 ```
 
@@ -68,14 +77,27 @@ A handshake response is shown as follows:
 
 ```javascript
 {
-  "code": 200, // response code
-  "sys": {
-    "heartbeat": 3, // heartbeat interval in second
-    "dict": {}, // route dictionary
-  },
-  "user": {
-    // Any customized response data
-  }
+    "code"
+:
+    200, // response code
+            "sys"
+:
+    {
+        "heartbeat"
+    :
+        3, // heartbeat interval in second
+                "dict"
+    :
+        {
+        }
+    , // route dictionary
+    }
+,
+    "user"
+:
+    {
+        // Any customized response data
+    }
 }
 ```
 
@@ -117,7 +139,7 @@ to the payload.
 #### Disconnect Package
 
 When server wants to break a client connection, such as kicking an online player off, it
-will first sends a control message  and then breaks the connection. Client can use this
+will first sends a control message and then breaks the connection. Client can use this
 control message to determine whether server breaks the connection.
 
 ## Nano Message
@@ -147,7 +169,8 @@ Flag occupies first byte of message header, its content is shown as follows:
 
 Now we only use 4 bits and others are reserved, 3 bits for message type, the rest 1 bit for
 route compression flag:
-* Message type is used to identify the message type, it occupies 3 bits  that it can support 8 types from 0 to 7, and now we only use 0~3 to support 4 types of message: request, notify, response, push.
+
+* Message type is used to identify the message type, it occupies 3 bits that it can support 8 types from 0 to 7, and now we only use 0~3 to support 4 types of message: request, notify, response, push.
 * The last 1 bit is used to indicate whether route compression is enabled, it will affect route field.
 * These two parts are independent of each other.
 
@@ -155,7 +178,7 @@ route compression flag:
 
 Different message types is corresponding to different message header, message types is identified
 by 2-4 bit of flag field. The relationship between message types and message header is presented
- as follows:
+as follows:
 
 ![Message Head Content](images/message-type.png)
 
@@ -170,14 +193,14 @@ on this bit, the format is shown as follows:
 ![Message Type](images/route-compre.png)
 
 As seen from the figure above:
+
 * If route compression flag is 1 , route is a compressed route and it will be an uInt16 using which can obtain real route by querying the dictionary.
-* If route compression flag is 0, route includes two parts, a uInt8 is  used to indicate the route string length in bytes and a utf8-encoded route string whose maximum length is limited to 256 bytes.
+* If route compression flag is 0, route includes two parts, a uInt8 is used to indicate the route string length in bytes and a utf8-encoded route string whose maximum length is limited to 256 bytes.
 
 ## Summary
 
 This document describes the wire-protocol for nano, including package layer and message layer. When
 developers uses nano underlying network library, they can implement client SDK for various platforms
 according to the protocol illustrated here.
-
 
 ***Copyright***:Parts of above content and figures come from [Pomelo Protocol](https://github.com/NetEase/pomelo/wiki/Communication-Protocol)

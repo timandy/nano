@@ -18,6 +18,7 @@ nano.request('Room.Join',
 );
 
 ```
+
 The routing information indicates that the request should be handled by send method of Join on
 Room component. When server pushing messages to the client, route also should be specified to
 indicate a handler. In the chat example, there are onAdd, onLeave and other routes. Considering

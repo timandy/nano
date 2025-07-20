@@ -10,7 +10,7 @@ html {
     background: #FFF;
 }
 
-body,div,dl,dt,dd,ul,ol,li,h1,h2,h3,h4,h5,h6,pre,code,form,fieldset,legend,input,textarea,p,blockquote,th,td {
+body, div, dl, dt, dd, ul, ol, li, h1, h2, h3, h4, h5, h6, pre, code, form, fieldset, legend, input, textarea, p, blockquote, th, td {
     margin: 0;
     padding: 0;
 }
@@ -20,11 +20,11 @@ table {
     border-spacing: 0;
 }
 
-fieldset,img {
+fieldset, img {
     border: 0;
 }
 
-address,caption,cite,code,dfn,em,strong,th,var {
+address, caption, cite, code, dfn, em, strong, th, var {
     font-style: normal;
     font-weight: normal;
 }
@@ -34,20 +34,20 @@ li {
     /* height: 70px; */
 }
 
-caption,th {
+caption, th {
     text-align: left;
 }
 
-h1,h2,h3,h4,h5,h6 {
+h1, h2, h3, h4, h5, h6 {
     font-size: 100%;
     font-weight: normal;
 }
 
-q:before,q:after {
+q:before, q:after {
     content: '';
 }
 
-abbr,acronym {
+abbr, acronym {
     border: 0;
     font-variant: normal;
 }
@@ -60,13 +60,13 @@ sub {
     vertical-align: text-bottom;
 }
 
-input,textarea,select {
+input, textarea, select {
     font-family: inherit;
     font-size: inherit;
     font-weight: inherit;
 }
 
-input,textarea,select {
+input, textarea, select {
     *font-size: 100%;
 }
 
@@ -81,7 +81,7 @@ html {
 }
 
 body {
-    font-family: "proxima-nova-1","proxima-nova-2", arial, sans-serif;
+    font-family: "proxima-nova-1", "proxima-nova-2", arial, sans-serif;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -150,7 +150,7 @@ strong {
     display: inline-block;
 }
 
-#chatText,#chat {
+#chatText, #chat {
     font-size: 3em;
     font-weight: bold;
     max-width: 70%;
@@ -163,7 +163,7 @@ strong {
     top: 60%;
     left: 50%;
     padding: 10px 20px;
-    background: rgba(255,255,255,.1);
+    background: rgba(255, 255, 255, .1);
     border-radius: 20px;
     color: #fff;
     text-align: center;
@@ -185,7 +185,7 @@ strong {
     top: 200px;
     left: 10px;
     padding: 10px 20px;
-    color: rgba(249,136,119,0.9);
+    color: rgba(249, 136, 119, 0.9);
     width: 400px;
     font-size: 2em;
     font-weight: bold;
@@ -205,7 +205,7 @@ strong {
     background-image: -o-linear-gradient(top, #fff, #e2e2e2);
     background-image: -moz-linear-gradient(top, #fff, #e2e2e2);
     background-image: -ms-linear-gradient(top, #fff, #e2e2e2);
-    background-image: -webkit-gradient(linear,left top,left bottom,color-stop(0, #fff),color-stop(1, #e2e2e2));
+    background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #fff), color-stop(1, #e2e2e2));
     border-radius: 10px;
     box-shadow: 1px 1px 5px #000;
     top: 55%;
@@ -257,7 +257,7 @@ a#force-init-button:hover {
     left: 0;
     bottom: 0;
     width: 100%;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
 }
 
 #info section {
@@ -362,37 +362,37 @@ a#force-init-button:hover {
 }
 
 #message-list h3 .back {
-   position: absolute;
-   width: 40px;
-   top: 0;
-   bottom: 0;
-   left: 0;
-   border-right: 2px solid #777;
+    position: absolute;
+    width: 40px;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-right: 2px solid #777;
 }
 
 #message-list h3 .name {
-   position: absolute;
-   top: 0;
-   bottom: 0;
-   left: 60px;
-   right: 80px;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 60px;
+    right: 80px;
 }
 
 #message-list h3 .detail {
-   position: absolute;
-   width: 70px;
-   right: 0;
-   top: 0;
-   bottom: 0;
+    position: absolute;
+    width: 70px;
+    right: 0;
+    top: 0;
+    bottom: 0;
 }
 
 #message-list ul {
-    position:absolute;
-    top:50px;
-    bottom:50px;
-    left:0px;
-    right:0px;
-    overflow:auto;
+    position: absolute;
+    top: 50px;
+    bottom: 50px;
+    left: 0px;
+    right: 0px;
+    overflow: auto;
 }
 
 #message-list li {
@@ -438,32 +438,32 @@ a#force-init-button:hover {
     height: 35px;
     float: left;
     display: block;
-    background:#fff;
-    border:1px solid #777;
-    border-radius:2.5em;
+    background: #fff;
+    border: 1px solid #777;
+    border-radius: 2.5em;
 }
 
 .text-input {
     width: 79%;
     height: 100%;
     margin: 0px 2em;
-    border:none;
+    border: none;
 }
 
 .select-pic {
-    border:1px solid #000;
-    border-radius:2em;
-    width:2em;
-    height:2em;
-    font-size:1em;
-    margin-right:0.5em;
+    border: 1px solid #000;
+    border-radius: 2em;
+    width: 2em;
+    height: 2em;
+    font-size: 1em;
+    margin-right: 0.5em;
 }
 
 .send-button {
-    float:right;
+    float: right;
     width: 60px;
     border: 1px solid #444;
-    border-radius:2em;
+    border-radius: 2em;
     height: 35px;
-    margin-right:12px;
+    margin-right: 12px;
 }

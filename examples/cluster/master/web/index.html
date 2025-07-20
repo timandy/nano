@@ -26,7 +26,7 @@
         el: "#container",
         data: {
             nickname: nickname,
-            inputMessage:'',
+            inputMessage: '',
             messages: [],
             balance: 1000,
         },
@@ -46,7 +46,7 @@
 
     var onNewUser = function (data) {
         console.log(data);
-        v.messages.push({name:'system', content:data.content});
+        v.messages.push({name: 'system', content: data.content});
     };
 
     var onBalance = function (data) {
@@ -56,14 +56,14 @@
 
     var onMembers = function (data) {
         console.log(data);
-        v.messages.push({name:'system', content: "members: "+data.members});
+        v.messages.push({name: 'system', content: "members: " + data.members});
     };
 
 
     var login = function (data) {
         console.log(data);
-        if(data.code === 0) {
-            v.messages.push({name:'system', content:data.result});
+        if (data.code === 0) {
+            v.messages.push({name: 'system', content: data.result});
             starx.on('onMessage', onMessage)
         }
     };

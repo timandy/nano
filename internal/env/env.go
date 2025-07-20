@@ -33,13 +33,13 @@ import (
 )
 
 var (
-	Wd                 string                   // working path
-	Die                chan bool                // wait for end application
-	Heartbeat          time.Duration            // Heartbeat internal
-	CheckOrigin        func(*http.Request) bool // check origin when websocket enabled
-	Debug              bool                     // enable Debug
-	WSPath             string                   // WebSocket path(eg: ws://127.0.0.1/WSPath)
-	HandshakeValidator func(*session.Session, []byte) error       // When you need to verify the custom data of the handshake request
+	Wd                 string                               // working path
+	Die                chan bool                            // wait for end application
+	Heartbeat          time.Duration                        // Heartbeat internal
+	CheckOrigin        func(*http.Request) bool             // check origin when websocket enabled
+	Debug              bool                                 // enable Debug
+	WSPath             string                               // WebSocket path(eg: ws://127.0.0.1/WSPath)
+	HandshakeValidator func(*session.Session, []byte) error // When you need to verify the custom data of the handshake request
 
 	// timerPrecision indicates the precision of timer, default is time.Second
 	TimerPrecision = time.Second

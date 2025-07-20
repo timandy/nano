@@ -13,7 +13,7 @@ var StarXService = function (model) {
         });
     };
 
-    this.sendMessage = function(msg){
+    this.sendMessage = function (msg) {
         starx.notify("World.Message", {
             message: msg
         });

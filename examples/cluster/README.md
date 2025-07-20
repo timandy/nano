@@ -2,8 +2,6 @@
 
 ## About this example
 
-
-
 ## How to run the example?
 
 ```shell

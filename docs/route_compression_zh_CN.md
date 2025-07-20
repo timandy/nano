@@ -16,6 +16,7 @@ nano.request('Room.Join',
 );
 
 ```
+
 这个路由信息指出，处理这个请求的应该是Room组件的Join方法。当服务器给客户端推送消息的时候，同样也需要指
 明客户端的路由信息，在例子聊天应用中有onAdd，onLeave等。考虑当用户发起聊天的信息很短的时候，比如用户仅
 仅发了一个字，而我们在传输的时候一样要加上一个完整的路由信息，这样将造成实际传输中，有效数据率极低，网
@@ -38,13 +39,16 @@ nano.request('Room.Join',
 么样呢？不用怕，对于在dictionary中找不到的路由信息，`nano`还是会使用原来不压缩的路由。
 
 ## 小结
+
 到目前位置，我们客户端与服务器之间使用的消息传输格式一直都是json。实际上，虽然json很方便，但是由于其还带
 了一些字段信息，在客户端和服务端数据包格式统一的情况下，这些字段信息是可以省略的，可以直接传输具体的消息，
 也就是说不再以字符串作为通信格式了，直接发送有效的二进制数据将会更好地减少额外开销，`nano`可以使用Protobuf
 作为二进制协议, 可以通过:
+
 ```go
 nano.WithSerializer(protobuf.NewSerializer())
 ```
+
 让nano选择Protobuf作为二进制协议
 
 ***Copyright***:以上的部分内容与图表来自于[Pomelo Route compression](https://github.com/NetEase/pomelo/wiki/Route-compression)

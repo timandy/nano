@@ -2,6 +2,7 @@ package onegate
 
 import (
 	"fmt"
+
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/examples/cluster/protocol"
 	"github.com/lonng/nano/session"

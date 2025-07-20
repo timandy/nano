@@ -11,17 +11,17 @@
 ## 前言
 
 - 本教程适用于对`nano`零基础的用户，如果你已经有过一定的`nano`开发基础，请跳过这个教程，你可以阅读
-开发指南，那里会对一些话题作较为详细的探讨。
+  开发指南，那里会对一些话题作较为详细的探讨。
 
 - 由于`nano`是基于Go开发的，因此希望你在阅读本教程前对Go语言有一些了解。
 
 - 本教程的示例源码放在github上[完整代码](https://github.com/lonnng/nano/tree/master/examples/demo/chat)
 
 - 本教程将以一个实时聊天应用为例子，通过对这个应用进行不同的修改来展示`nano`框架的一些功能特性，让用
-户能大致了解`nano`，熟悉并能够使用`nano`进行应用程序的开发。
+  户能大致了解`nano`，熟悉并能够使用`nano`进行应用程序的开发。
 
 - 本教程假定你使用的开发环境是类Unix系统，如果你使用的Windows系统，希望你能够知道相关的对应方式，比
-如一些.sh脚本，在Windows下会使用一个同名的bat文件，本教程中对于Windows系统，不做特殊说明。
+  如一些.sh脚本，在Windows下会使用一个同名的bat文件，本教程中对于Windows系统，不做特殊说明。
 
 ## 术语解释
 
@@ -33,6 +33,7 @@
 `nano`应用是由一些松散耦合的`Component`组成的，每个`Component`完成一些功能。整个应用可以看作是一
 个`Component`容器，完成`Component`的加载以及生命周期管理。每个`Component`往往有`Init`，`AfterInit`，
 `BeforeShutdown`，`Shutdown`等方法，用来完成生命周期管理。
+
 ```go
 type DemoComponent struct{}
 
@@ -45,6 +46,7 @@ func (c *DemoComponent) Shutdown()       {}
 ### Handler
 
 `Handler`用来处理业务逻辑，`Handler`可以有如下形式的签名：
+
 ```go
 // 以下的Handler会自动将消息反序列化，在调用时当做参数传进来
 func (c *DemoComponent) DemoHandler(s *session.Session, payload *pb.DemoPayload) error {
@@ -95,6 +97,7 @@ route用来标识一个具体服务或者客户端接受服务端推送消息的
 ## 示例开始
 
 ### Server
+
 ```go
 package main
 
@@ -189,12 +192,12 @@ func main() {
 3. 定义所有全后端交互可能用到的协议结构体(实际项目中可能使用Protobuf)
 4. 定义所有的Handler, 这里包含`Join`和`Message`
 5. 启动我们的应用
-   - 注册组件
-   - 设置序列化反序列器
-   - 开启调试信息
-   - 设置log输出信息
-   - Set WebSocket check origin function
-   - 开始监听`WebSocket`地址":3250"
+    - 注册组件
+    - 设置序列化反序列器
+    - 开启调试信息
+    - 设置log输出信息
+    - Set WebSocket check origin function
+    - 开始监听`WebSocket`地址":3250"
 
 ### Client
 

@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/lonng/nano/cluster/clusterpb"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/lonng/nano/cluster/clusterpb"
 
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/examples/customerroute/onegate"

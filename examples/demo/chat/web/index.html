@@ -23,8 +23,8 @@
     var v = new Vue({
         el: "#container",
         data: {
-            nickname:'guest' + Date.now(),
-            inputMessage:'',
+            nickname: 'guest' + Date.now(),
+            inputMessage: '',
             messages: []
         },
         methods: {
@@ -42,20 +42,20 @@
 
     var join = function (data) {
         console.log(data);
-        if(data.code === 0) {
-            v.messages.push({name:'system', content:data.result});
+        if (data.code === 0) {
+            v.messages.push({name: 'system', content: data.result});
             starx.on('onMessage', onMessage)
         }
     };
 
     var onNewUser = function (data) {
         console.log(data);
-        v.messages.push({name:'system', content:data.content});
+        v.messages.push({name: 'system', content: data.content});
     };
 
     var onMembers = function (data) {
         console.log(data);
-        v.messages.push({name:'system', content: "members: "+data.members});
+        v.messages.push({name: 'system', content: "members: " + data.members});
     };
 
     starx.init({host: '127.0.0.1', port: 3250, path: '/nano'}, function () {

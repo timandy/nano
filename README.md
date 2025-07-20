@@ -1,12 +1,19 @@
-# Nano [![Build Status][1]][2] [![GoDoc][3]][4] [![Go Report Card][5]][6] [![MIT licensed][7]][8] 
+# Nano [![Build Status][1]][2] [![GoDoc][3]][4] [![Go Report Card][5]][6] [![MIT licensed][7]][8]
 
 [1]: https://github.com/lonng/nano/actions/workflows/go.yml/badge.svg?branch=master
+
 [2]: https://github.com/lonng/nano/actions/workflows/go.yml
+
 [3]: https://godoc.org/github.com/lonng/nano?status.svg
+
 [4]: https://godoc.org/github.com/lonng/nano
+
 [5]: https://goreportcard.com/badge/github.com/lonng/nano
+
 [6]: https://goreportcard.com/report/github.com/lonng/nano
+
 [7]: https://img.shields.io/badge/license-MIT-blue.svg
+
 [8]: LICENSE
 
 Nano is an easy to use, fast, lightweight game server networking library for Go.
@@ -18,7 +25,7 @@ spend time on repetitious network related programming.
 Nano was designed for server-side applications like real-time games, social games,
 mobile games, etc of all sizes.
 
-Join to Discord: [Nano Community](https://discord.gg/eHEDrBH5PV) 
+Join to Discord: [Nano Community](https://discord.gg/eHEDrBH5PV)
 
 ## How to build a system with `Nano`
 
@@ -28,9 +35,10 @@ The simplest "nano" application as shown in the following figure, you can make p
 
 ![Application](media/application.png)
 
-In fact, the `nano` application is a collection of  [Component ](./docs/get_started.md#component) , and a component is a bundle of  [Handler](./docs/get_started.md#handler), once you register a component to nano, nano will register all methods that can be converted to `Handler` to nano service container. Service was accessed by `Component.Handler`, and the handler will be called while client request. The handler will receive two parameters while handling a message:
-  - `*session.Session`: corresponding a client that apply this request or notify.
-  - `*protocol.FooBar`: the payload of the request.
+In fact, the `nano` application is a collection of[Component ](./docs/get_started.md#component) , and a component is a bundle of[Handler](./docs/get_started.md#handler), once you register a component to nano, nano will register all methods that can be converted to `Handler` to nano service container. Service was accessed by `Component.Handler`, and the handler will be called while client request. The handler will receive two parameters while handling a message:
+
+- `*session.Session`: corresponding a client that apply this request or notify.
+- `*protocol.FooBar`: the payload of the request.
 
 While you had processed your logic, you can response or push message to the client by `session.Response(payload)` and `session.Push('eventName', payload)`, or returns error when some unexpected data received.
 
@@ -81,16 +89,16 @@ func (manager *PlayerManager) Login(s *session.Session, msg *ReqPlayerLogin) err
 ## Resources
 
 - Javascript
-  + [nano-websocket-client](https://github.com/lonnng/nano-websocket-client)
-  + [nano-egret-client](https://github.com/lonnng/nano-egret-client)
+    + [nano-websocket-client](https://github.com/lonnng/nano-websocket-client)
+    + [nano-egret-client](https://github.com/lonnng/nano-egret-client)
 
 - Typescript/cocos-creator
-  + [nano-client-ts](https://github.com/adoontheway/nano-client-ts)
+    + [nano-client-ts](https://github.com/adoontheway/nano-client-ts)
 
 - Demo
-  + [Implement a chat room in 100 lines with nano and WebSocket](./examples/demo/chat)
-  + [Tadpole demo](./examples/demo/tadpole)
-  + [四川麻将, 血战到底(三人模式/四人模式)完整项目实例](https://github.com/lonnng/nanoserver)
+    + [Implement a chat room in 100 lines with nano and WebSocket](./examples/demo/chat)
+    + [Tadpole demo](./examples/demo/tadpole)
+    + [四川麻将, 血战到底(三人模式/四人模式)完整项目实例](https://github.com/lonnng/nanoserver)
 
 ## Community
 
@@ -121,6 +129,7 @@ go get -u google.golang.org/grpc
 ```
 
 ## Protocol Buffers
+
 ```bash
 # protoc
 # download form: https://github.com/protocolbuffers/protobuf/releases
@@ -132,6 +141,7 @@ go install github.com/go-delve/delve/cmd/dlv@latest
 ```
 
 ## Test
+
 ```bash
 go test -v ./...
 ```

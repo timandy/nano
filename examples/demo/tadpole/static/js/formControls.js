@@ -46,13 +46,11 @@ $.fn.initChat = function () {
                         messagePointer--;
                         input.val(messageHistory[messagePointer]);
                     }
-                }
-                else if (e.keyCode == keys.down) {
+                } else if (e.keyCode == keys.down) {
                     if (messagePointer < messageHistory.length - 1) {
                         messagePointer++;
                         input.val(messageHistory[messagePointer]);
-                    }
-                    else {
+                    } else {
                         closechat();
                         return;
                     }

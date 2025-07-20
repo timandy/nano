@@ -2,12 +2,12 @@ App = function (aSettings, aCanvas) {
     var app = this;
 
     var model,
-        canvas,
-        context,
-        starXService;
+            canvas,
+            context,
+            starXService;
     mouse = {x: 0, y: 0, worldx: 0, worldy: 0, tadpole: null},
-        keyNav = {x: 0, y: 0},
-        messageQuota = 5;
+            keyNav = {x: 0, y: 0},
+            messageQuota = 5;
 
     app.update = function () {
         if (messageQuota < 5 && model.userTadpole.age % 50 == 0) {
@@ -17,8 +17,7 @@ App = function (aSettings, aCanvas) {
         // Update usertadpole
         if (keyNav.x != 0 || keyNav.y != 0) {
             model.userTadpole.userUpdate(model.tadpoles, model.userTadpole.x + keyNav.x, model.userTadpole.y + keyNav.y);
-        }
-        else {
+        } else {
             var mvp = getMouseWorldPosition();
             mouse.worldx = mvp.x;
             mouse.worldy = mvp.y;
@@ -100,18 +99,15 @@ App = function (aSettings, aCanvas) {
             keyNav.y = -1;
             model.userTadpole.momentum = model.userTadpole.targetMomentum = model.userTadpole.maxMomentum;
             e.preventDefault();
-        }
-        else if (e.keyCode == keys.down) {
+        } else if (e.keyCode == keys.down) {
             keyNav.y = 1;
             model.userTadpole.momentum = model.userTadpole.targetMomentum = model.userTadpole.maxMomentum;
             e.preventDefault();
-        }
-        else if (e.keyCode == keys.left) {
+        } else if (e.keyCode == keys.left) {
             keyNav.x = -1;
             model.userTadpole.momentum = model.userTadpole.targetMomentum = model.userTadpole.maxMomentum;
             e.preventDefault();
-        }
-        else if (e.keyCode == keys.right) {
+        } else if (e.keyCode == keys.right) {
             keyNav.x = 1;
             model.userTadpole.momentum = model.userTadpole.targetMomentum = model.userTadpole.maxMomentum;
             e.preventDefault();
@@ -124,8 +120,7 @@ App = function (aSettings, aCanvas) {
                 model.userTadpole.targetMomentum = 0;
             }
             e.preventDefault();
-        }
-        else if (e.keyCode == keys.left || e.keyCode == keys.right) {
+        } else if (e.keyCode == keys.left || e.keyCode == keys.right) {
             keyNav.x = 0;
             if (keyNav.x == 0 && keyNav.y == 0) {
                 model.userTadpole.targetMomentum = 0;

@@ -130,7 +130,7 @@ var messageList = new Vue({
         currentMessage: '',
         messages: [
             {
-                location:'left',
+                location: 'left',
                 content: 'hello world'
             }
         ]
@@ -138,7 +138,7 @@ var messageList = new Vue({
     methods: {
         sendMessage: function () {
             this.messages.push({
-                location:'right',
+                location: 'right',
                 content: this.currentMessage
             })
         },
@@ -155,7 +155,7 @@ var messageList = new Vue({
 var conversations = new Vue({
     el: "#conversation-list",
     data: {
-        conversations:[
+        conversations: [
             {
                 avatar: 'http://pic.qiushibaike.com/system/avtnew/3118/31183960/thumb/20160216132422.jpg',
                 name: 'hello',
@@ -194,12 +194,14 @@ var conversations = new Vue({
 
 new Vue({
     el: '#user-profile',
-    data:{profile:{
-        avatar: 'http://pic.qiushibaike.com/system/avtnew/3118/31183960/thumb/20160216132422.jpg',
-        location: 'China',
-        name: 'Chris Lonng',
-        sex: 'Male',
-        signature: 'hello world, i am here'
-    }},
-    methods:{}
+    data: {
+        profile: {
+            avatar: 'http://pic.qiushibaike.com/system/avtnew/3118/31183960/thumb/20160216132422.jpg',
+            location: 'China',
+            name: 'Chris Lonng',
+            sex: 'Male',
+            signature: 'hello world, i am here'
+        }
+    },
+    methods: {}
 });

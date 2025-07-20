@@ -14,21 +14,21 @@ the rest of the framework can be used for development of real-time web applicati
 ## Preface
 
 - This tutorial is suitable for beginners, if you have some development experience in nano,
-please skip this tutorial. You can read the developer guide, there will be some topics
-discussed in detail.
+  please skip this tutorial. You can read the developer guide, there will be some topics
+  discussed in detail.
 
 - Since nano is based on Go, so we hope you have some familiarity with Go before reading this
-tutorial.
+  tutorial.
 
 - The tutorial examples' source code is on github, [complete code](https://github.com/lonnng/nano/tree/master/examples/demo/chat)
 
 - This tutorial uses a real-time chat application as an example, and we make some modifications
-of the example to show different features of nano, allowing users to have a general understanding
-of nano, and be familiar with it and be able to use it for application development.
+  of the example to show different features of nano, allowing users to have a general understanding
+  of nano, and be familiar with it and be able to use it for application development.
 
 - This tutorial assumes that your development environment is Unix-like system, if you use
-Windows, we hope you know the corresponding manner, such as some .sh script, and uses a bat
-file with the same name. This tutorial would not make any special instructions for Windows system.
+  Windows, we hope you know the corresponding manner, such as some .sh script, and uses a bat
+  file with the same name. This tutorial would not make any special instructions for Windows system.
 
 ## Terminologies
 
@@ -40,6 +40,7 @@ we will try and give readers an overview of some common terms you may come acros
 The nano framework is composed of a number of loosely coupled components and the nano framework
 can be regarded as a container of component. Each component defines callbacks: `Init`, `AfterInit`,
 `BeforeShutdown`, `Shutdown`.
+
 ```go
 type DemoComponent struct{}
 
@@ -52,6 +53,7 @@ func (c *DemoComponent) Shutdown()       {}
 ### Handler
 
 Handler is used to do business logic, which signature is declared as follows:
+
 ```go
 // handler that receives unmarshalled data
 func (c *DemoComponent) DemoHandler(s *session.Session, payload *pb.DemoPayload) error {
@@ -106,6 +108,7 @@ server to client actively.
 ## Get started
 
 ### Server
+
 ```go
 package main
 
@@ -200,12 +203,13 @@ func main() {
 3. Define all protocol structure, we use JSON in this tutorial.
 4. Define handlers, `Join` and `Message` in this tutorial.
 5. Startup our application
-   - Register component
-   - Set serializer
-   - Enable debug information
-   - Set log flags
-   - Set WebSocket check origin function
-   - Listen with ":3250" use WebSocket
+
+- Register component
+- Set serializer
+- Enable debug information
+- Set log flags
+- Set WebSocket check origin function
+- Listen with ":3250" use WebSocket
 
 ### Client
 

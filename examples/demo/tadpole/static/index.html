@@ -4,17 +4,17 @@
 <head>
     <meta charset="utf-8">
     <title>Tadpole</title>
-    <link rel="stylesheet" type="text/css" href="./css/main.css"/>
+    <link href="./css/main.css" rel="stylesheet" type="text/css"/>
 
-    <meta name="viewport"
-          content="width=device-width; initial-scale=1.0; maximum-scale=1.0; minimum-scale=1.0; user-scalable=0;"/>
-    <meta name="apple-mobile-web-app-capable" content="YES">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="apple-touch-icon" href="./images/apple-touch-icon.png"/>
-    <meta property="fb:app_id" content="149260988448984"/>
-    <meta name="title" content="Enjoy Random"/>
-    <meta name="description" content="random joy"/>
-    <link rel="image_src" href="./images/fb-image.jpg"/>
+    <meta content="width=device-width; initial-scale=1.0; maximum-scale=1.0; minimum-scale=1.0; user-scalable=0;"
+          name="viewport"/>
+    <meta content="YES" name="apple-mobile-web-app-capable">
+    <meta content="black" name="apple-mobile-web-app-status-bar-style">
+    <link href="./images/apple-touch-icon.png" rel="apple-touch-icon"/>
+    <meta content="149260988448984" property="fb:app_id"/>
+    <meta content="Enjoy Random" name="title"/>
+    <meta content="random joy" name="description"/>
+    <link href="./images/fb-image.jpg" rel="image_src"/>
 </head>
 <body>
 <canvas id="canvas"></canvas>
@@ -28,8 +28,8 @@
         </div>
 
         <div class="message-controls">
-            <input type="button" class="message-drop" @click="drop" value="没兴趣">
-            <input type="button" class="message-send" @click="try" value="聊一聊">
+            <input @click="drop" class="message-drop" type="button" value="没兴趣">
+            <input @click="try" class="message-send" type="button" value="聊一聊">
         </div>
     </div>
 
@@ -46,14 +46,14 @@
     </div>
     <div id="unsupported-browser">
         <p>亲爱的玩家: <br/>
-            你的浏览器版本太低, 或者<a rel="external" href="http://en.wikipedia.org/wiki/WebSocket">WebSockets</a>功能被禁用,
+            你的浏览器版本太低, 或者<a href="http://en.wikipedia.org/wiki/WebSocket" rel="external">WebSockets</a>功能被禁用,
             推荐使用下列浏览器.
         </p>
         <ul>
-            <li><a rel="external" href="http://www.google.com/chrome">Google Chrome</a></li>
-            <li><a rel="external" href="http://apple.com/safari">Safari 4</a></li>
-            <li><a rel="external" href="http://www.mozilla.com/firefox/">Firefox 4</a></li>
-            <li><a rel="external" href="http://www.opera.com/">Opera 11</a></li>
+            <li><a href="http://www.google.com/chrome" rel="external">Google Chrome</a></li>
+            <li><a href="http://apple.com/safari" rel="external">Safari 4</a></li>
+            <li><a href="http://www.mozilla.com/firefox/" rel="external">Firefox 4</a></li>
+            <li><a href="http://www.opera.com/" rel="external">Opera 11</a></li>
         </ul>
         <p>
             <a href="#" id="force-init-button">我要试试!</a>
