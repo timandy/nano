@@ -72,7 +72,7 @@ type (
 		typ     message.Type // message type
 		route   string       // message route(push)
 		mid     uint64       // response message id(response)
-		payload interface{}  // payload
+		payload any          // payload
 	}
 )
 
@@ -113,7 +113,7 @@ func (a *agent) LastMid() uint64 {
 }
 
 // Push, implementation for session.NetworkEntity interface
-func (a *agent) Push(route string, v interface{}) error {
+func (a *agent) Push(route string, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
 	}
@@ -137,7 +137,7 @@ func (a *agent) Push(route string, v interface{}) error {
 }
 
 // RPC, implementation for session.NetworkEntity interface
-func (a *agent) RPC(route string, v interface{}) error {
+func (a *agent) RPC(route string, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
 	}
@@ -158,13 +158,13 @@ func (a *agent) RPC(route string, v interface{}) error {
 
 // Response, implementation for session.NetworkEntity interface
 // Response message to session
-func (a *agent) Response(v interface{}) error {
+func (a *agent) Response(v any) error {
 	return a.ResponseMid(a.lastMid, v)
 }
 
 // ResponseMid, implementation for session.NetworkEntity interface
 // Response message to session
-func (a *agent) ResponseMid(mid uint64, v interface{}) error {
+func (a *agent) ResponseMid(mid uint64, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
 	}

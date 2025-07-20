@@ -32,11 +32,11 @@ import (
 
 // NetworkEntity represent low-level network instance
 type NetworkEntity interface {
-	Push(route string, v interface{}) error
-	RPC(route string, v interface{}) error
+	Push(route string, v any) error
+	RPC(route string, v any) error
 	LastMid() uint64
-	Response(v interface{}) error
-	ResponseMid(mid uint64, v interface{}) error
+	Response(v any) error
+	ResponseMid(mid uint64, v any) error
 	Close() error
 	RemoteAddr() net.Addr
 }
@@ -51,12 +51,12 @@ var (
 // Session instance related to the client will be passed to Handler method as the first
 // parameter.
 type Session struct {
-	sync.RWMutex                        // protect data
-	id           int64                  // session global unique id
-	uid          int64                  // binding user id
-	lastTime     int64                  // last heartbeat time
-	entity       NetworkEntity          // low-level network entity
-	data         map[string]interface{} // session data store
+	sync.RWMutex                // protect data
+	id           int64          // session global unique id
+	uid          int64          // binding user id
+	lastTime     int64          // last heartbeat time
+	entity       NetworkEntity  // low-level network entity
+	data         map[string]any // session data store
 	router       *Router
 }
 
@@ -66,7 +66,7 @@ func New(entity NetworkEntity) *Session {
 	return &Session{
 		id:       service.Connections.SessionID(),
 		entity:   entity,
-		data:     make(map[string]interface{}),
+		data:     make(map[string]any),
 		lastTime: time.Now().Unix(),
 		router:   newRouter(),
 	}
@@ -83,23 +83,23 @@ func (s *Session) Router() *Router {
 }
 
 // RPC sends message to remote server
-func (s *Session) RPC(route string, v interface{}) error {
+func (s *Session) RPC(route string, v any) error {
 	return s.entity.RPC(route, v)
 }
 
 // Push message to client
-func (s *Session) Push(route string, v interface{}) error {
+func (s *Session) Push(route string, v any) error {
 	return s.entity.Push(route, v)
 }
 
 // Response message to client
-func (s *Session) Response(v interface{}) error {
+func (s *Session) Response(v any) error {
 	return s.entity.Response(v)
 }
 
 // ResponseMID responses message to client, mid is
 // request message ID
-func (s *Session) ResponseMID(mid uint64, v interface{}) error {
+func (s *Session) ResponseMID(mid uint64, v any) error {
 	return s.entity.ResponseMid(mid, v)
 }
 
@@ -148,7 +148,7 @@ func (s *Session) Remove(key string) {
 }
 
 // Set associates value with the key in session storage
-func (s *Session) Set(key string, value interface{}) {
+func (s *Session) Set(key string, value any) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -385,8 +385,8 @@ func (s *Session) String(key string) string {
 	return value
 }
 
-// Value returns the value associated with the key as a interface{}.
-func (s *Session) Value(key string) interface{} {
+// Value returns the value associated with the key as a any.
+func (s *Session) Value(key string) any {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -394,7 +394,7 @@ func (s *Session) Value(key string) interface{} {
 }
 
 // State returns all session state
-func (s *Session) State() map[string]interface{} {
+func (s *Session) State() map[string]any {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -402,7 +402,7 @@ func (s *Session) State() map[string]interface{} {
 }
 
 // Restore session state after reconnect
-func (s *Session) Restore(data map[string]interface{}) {
+func (s *Session) Restore(data map[string]any) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -415,5 +415,5 @@ func (s *Session) Clear() {
 	defer s.Unlock()
 
 	s.uid = 0
-	s.data = map[string]interface{}{}
+	s.data = map[string]any{}
 }

@@ -76,7 +76,7 @@ func client() {
 		panic(err)
 	}
 
-	c.On("pong", func(data interface{}) {})
+	c.On("pong", func(data any) {})
 
 	<-chReady
 	for /*i := 0; i < 1; i++*/ {

@@ -96,7 +96,7 @@ func RegisterMasterServer(s grpc.ServiceRegistrar, srv MasterServer) {
 	s.RegisterService(&Master_ServiceDesc, srv)
 }
 
-func _Master_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Master_Register_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(RegisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -108,13 +108,13 @@ func _Master_Register_Handler(srv interface{}, ctx context.Context, dec func(int
 		Server:     srv,
 		FullMethod: "/clusterpb.Master/Register",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MasterServer).Register(ctx, req.(*RegisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Master_Unregister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Master_Unregister_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(UnregisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -126,13 +126,13 @@ func _Master_Unregister_Handler(srv interface{}, ctx context.Context, dec func(i
 		Server:     srv,
 		FullMethod: "/clusterpb.Master/Unregister",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MasterServer).Unregister(ctx, req.(*UnregisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Master_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Master_Heartbeat_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(HeartbeatRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func _Master_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(in
 		Server:     srv,
 		FullMethod: "/clusterpb.Master/Heartbeat",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MasterServer).Heartbeat(ctx, req.(*HeartbeatRequest))
 	}
 	return interceptor(ctx, in, info, handler)
@@ -322,7 +322,7 @@ func RegisterMemberServer(s grpc.ServiceRegistrar, srv MemberServer) {
 	s.RegisterService(&Member_ServiceDesc, srv)
 }
 
-func _Member_HandleRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_HandleRequest_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(RequestMessage)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -334,13 +334,13 @@ func _Member_HandleRequest_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/HandleRequest",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).HandleRequest(ctx, req.(*RequestMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_HandleNotify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_HandleNotify_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(NotifyMessage)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -352,13 +352,13 @@ func _Member_HandleNotify_Handler(srv interface{}, ctx context.Context, dec func
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/HandleNotify",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).HandleNotify(ctx, req.(*NotifyMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_HandlePush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_HandlePush_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(PushMessage)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -370,13 +370,13 @@ func _Member_HandlePush_Handler(srv interface{}, ctx context.Context, dec func(i
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/HandlePush",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).HandlePush(ctx, req.(*PushMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_HandleResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_HandleResponse_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ResponseMessage)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -388,13 +388,13 @@ func _Member_HandleResponse_Handler(srv interface{}, ctx context.Context, dec fu
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/HandleResponse",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).HandleResponse(ctx, req.(*ResponseMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_NewMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_NewMember_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(NewMemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -406,13 +406,13 @@ func _Member_NewMember_Handler(srv interface{}, ctx context.Context, dec func(in
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/NewMember",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).NewMember(ctx, req.(*NewMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_DelMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_DelMember_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DelMemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -424,13 +424,13 @@ func _Member_DelMember_Handler(srv interface{}, ctx context.Context, dec func(in
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/DelMember",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).DelMember(ctx, req.(*DelMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_SessionClosed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_SessionClosed_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(SessionClosedRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -442,13 +442,13 @@ func _Member_SessionClosed_Handler(srv interface{}, ctx context.Context, dec fun
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/SessionClosed",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).SessionClosed(ctx, req.(*SessionClosedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Member_CloseSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Member_CloseSession_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CloseSessionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -460,7 +460,7 @@ func _Member_CloseSession_Handler(srv interface{}, ctx context.Context, dec func
 		Server:     srv,
 		FullMethod: "/clusterpb.Member/CloseSession",
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(MemberServer).CloseSession(ctx, req.(*CloseSessionRequest))
 	}
 	return interceptor(ctx, in, info, handler)

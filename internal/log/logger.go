@@ -27,9 +27,9 @@ import (
 
 // Logger represents  the log interface
 type Logger interface {
-	Println(v ...interface{})
-	Fatal(v ...interface{})
-	Fatalf(format string, v ...interface{})
+	Println(v ...any)
+	Fatal(v ...any)
+	Fatalf(format string, v ...any)
 }
 
 func init() {
@@ -37,9 +37,9 @@ func init() {
 }
 
 var (
-	Println func(v ...interface{})
-	Fatal   func(v ...interface{})
-	Fatalf  func(format string, v ...interface{})
+	Println func(v ...any)
+	Fatal   func(v ...any)
+	Fatalf  func(format string, v ...any)
 )
 
 // SetLogger rewrites the default logger

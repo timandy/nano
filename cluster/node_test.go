@@ -115,7 +115,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	}
 	<-chWait
 	onResult := make(chan string)
-	connector.On("test", func(data interface{}) {
+	connector.On("test", func(data any) {
 		onResult <- string(data.([]byte))
 	})
 	err = connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
@@ -126,13 +126,13 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(strings.Contains(<-onResult, "game server pong"), IsTrue)
 
-	err = connector.Request("GateComponent.Test2", &testdata.Ping{Content: "ping"}, func(data interface{}) {
+	err = connector.Request("GateComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
 		onResult <- string(data.([]byte))
 	})
 	c.Assert(err, IsNil)
 	c.Assert(strings.Contains(<-onResult, "gate server pong2"), IsTrue)
 
-	err = connector.Request("GameComponent.Test2", &testdata.Ping{Content: "ping"}, func(data interface{}) {
+	err = connector.Request("GameComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
 		onResult <- string(data.([]byte))
 	})
 	c.Assert(err, IsNil)

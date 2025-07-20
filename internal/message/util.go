@@ -22,7 +22,7 @@ package message
 
 import "github.com/lonng/nano/internal/env"
 
-func Serialize(v interface{}) ([]byte, error) {
+func Serialize(v any) ([]byte, error) {
 	if data, ok := v.([]byte); ok {
 		return data, nil
 	}

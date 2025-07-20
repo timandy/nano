@@ -57,24 +57,24 @@ type rpcHandler func(session *session.Session, msg *message.Message, noCopy bool
 type CustomerRemoteServiceRoute func(service string, session *session.Session, members []*clusterpb.MemberInfo) *clusterpb.MemberInfo
 
 func cache() {
-	hrdata := map[string]interface{}{
+	hrdata := map[string]any{
 		"code": 200,
-		"sys": map[string]interface{}{
+		"sys": map[string]any{
 			"heartbeat":  env.Heartbeat.Seconds(),
 			"servertime": time.Now().UTC().Unix(),
 		},
 	}
 	if dict, ok := message.GetDictionary(); ok {
-		hrdata = map[string]interface{}{
+		hrdata = map[string]any{
 			"code": 200,
-			"sys": map[string]interface{}{
+			"sys": map[string]any{
 				"heartbeat":  env.Heartbeat.Seconds(),
 				"servertime": time.Now().UTC().Unix(),
 				"dict":       dict,
 			},
 		}
 	}
-	// data, err := json.Marshal(map[string]interface{}{
+	// data, err := json.Marshal(map[string]any{
 	// 	"code": 200,
 	// 	"sys": map[string]float64{
 	// 		"heartbeat": env.Heartbeat.Seconds(),
@@ -447,7 +447,7 @@ func (h *LocalHandler) localProcess(handler *component.Handler, lastMid uint64, 
 	}
 
 	var payload = msg.Data
-	var data interface{}
+	var data any
 	if handler.IsRawArg {
 		data = payload
 	} else {

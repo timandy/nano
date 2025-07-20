@@ -53,7 +53,7 @@ type (
 
 	// Callback represents the callback type which will be called
 	// when the correspond events is occurred.
-	Callback func(data interface{})
+	Callback func(data any)
 
 	// Connector is a tiny Nano client
 	Connector struct {

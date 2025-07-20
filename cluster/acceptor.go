@@ -20,7 +20,7 @@ type acceptor struct {
 }
 
 // Push implements the session.NetworkEntity interface
-func (a *acceptor) Push(route string, v interface{}) error {
+func (a *acceptor) Push(route string, v any) error {
 	// TODO: buffer
 	data, err := message.Serialize(v)
 	if err != nil {
@@ -36,7 +36,7 @@ func (a *acceptor) Push(route string, v interface{}) error {
 }
 
 // RPC implements the session.NetworkEntity interface
-func (a *acceptor) RPC(route string, v interface{}) error {
+func (a *acceptor) RPC(route string, v any) error {
 	// TODO: buffer
 	data, err := message.Serialize(v)
 	if err != nil {
@@ -57,12 +57,12 @@ func (a *acceptor) LastMid() uint64 {
 }
 
 // Response implements the session.NetworkEntity interface
-func (a *acceptor) Response(v interface{}) error {
+func (a *acceptor) Response(v any) error {
 	return a.ResponseMid(a.lastMid, v)
 }
 
 // ResponseMid implements the session.NetworkEntity interface
-func (a *acceptor) ResponseMid(mid uint64, v interface{}) error {
+func (a *acceptor) ResponseMid(mid uint64, v any) error {
 	// TODO: buffer
 	data, err := message.Serialize(v)
 	if err != nil {
