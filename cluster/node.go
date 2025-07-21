@@ -157,7 +157,7 @@ func (n *Node) initNode() error {
 	// Initialize the gRPC server and register service
 	n.server = grpc.NewServer()
 	n.rpcClient = newRPCClient()
-	clusterpb.RegisterMemberServer(n.server, n)
+	n.registerServices()
 
 	go func() {
 		err := n.server.Serve(listener)
@@ -167,7 +167,6 @@ func (n *Node) initNode() error {
 	}()
 
 	if n.IsMaster {
-		clusterpb.RegisterMasterServer(n.server, n.cluster)
 		member := &Member{
 			isMaster: true,
 			memberInfo: &clusterpb.MemberInfo{
@@ -204,6 +203,14 @@ func (n *Node) initNode() error {
 		n.once.Do(n.keepalive)
 	}
 	return nil
+}
+
+// registerServices 注册 grpc 服务
+func (n *Node) registerServices() {
+	clusterpb.RegisterMemberServer(n.server, n)
+	if n.IsMaster {
+		clusterpb.RegisterMasterServer(n.server, n.cluster)
+	}
 }
 
 // Shutdowns all components registered by application, that
