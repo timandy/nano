@@ -126,6 +126,13 @@ func Encode(typ packet.Type, data []byte) ([]byte, error) {
 	return buf, nil
 }
 
+// Replace 替换包中的占位符, 并调整包头长度
+func Replace(packet, old, new []byte) []byte {
+	buf := bytes.Replace(packet, old, new, 1)
+	copy(buf[1:HeadLength], intToBytes(len(buf)-HeadLength))
+	return buf
+}
+
 // Decode packet data length byte to int(Big end)
 func bytesToInt(b []byte) int {
 	result := 0

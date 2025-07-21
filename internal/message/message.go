@@ -24,9 +24,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
-
-	"github.com/lonng/nano/internal/log"
 )
 
 // Type represents the type of message, which could be Request/Notify/Response/Push
@@ -101,7 +100,6 @@ func routable(t Type) bool {
 
 func invalidType(t Type) bool {
 	return t < Request || t > Push
-
 }
 
 // Encode marshals message to binary format. Different message types is corresponding to
@@ -224,9 +222,9 @@ func Decode(data []byte) (*Message, error) {
 	return m, nil
 }
 
-// SetDictionary set routes map which be used to compress route.
-// TODO(warning): set dictionary in runtime would be a dangerous operation!!!!!!
-func SetDictionary(dict map[string]uint16) {
+// SetRouteDict 设置路由压缩编码字典
+// TODO(warning): 请不要再运行时设置, 危险!!!!!!
+func SetRouteDict(dict map[string]uint16) {
 	for route, code := range dict {
 		r := strings.TrimSpace(route)
 
@@ -245,7 +243,8 @@ func SetDictionary(dict map[string]uint16) {
 	}
 }
 
-func GetDictionary() (map[string]uint16, bool) {
+// GetRouteDict 获取路由压缩编码字典
+func GetRouteDict() (map[string]uint16, bool) {
 	if len(routes) <= 0 {
 		return nil, false
 	}

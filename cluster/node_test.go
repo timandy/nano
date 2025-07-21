@@ -1,11 +1,12 @@
 package cluster_test
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
-	"github.com/lonng/nano/benchmark/io"
 	"github.com/lonng/nano/benchmark/testdata"
+	"github.com/lonng/nano/benchmark/ws"
 	"github.com/lonng/nano/cluster"
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/scheduler"
@@ -53,12 +54,12 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 
 	masterComps := &component.Components{}
 	masterComps.Register(&MasterComponent{})
+	masterOpts := cluster.DefaultOptions()
+	masterOpts.IsMaster = true
+	masterOpts.Components = masterComps
+	masterOpts.ServiceAddr = "127.0.0.1:4450"
 	masterNode := &cluster.Node{
-		Options: cluster.Options{
-			IsMaster:   true,
-			Components: masterComps,
-		},
-		ServiceAddr: "127.0.0.1:4450",
+		Options: *masterOpts,
 	}
 	err := masterNode.Startup()
 	c.Assert(err, IsNil)
@@ -67,13 +68,12 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 
 	member1Comps := &component.Components{}
 	member1Comps.Register(&GateComponent{})
+	member1Opts := cluster.DefaultOptions()
+	member1Opts.AdvertiseAddr = "127.0.0.1:4450"
+	member1Opts.ServiceAddr = "127.0.0.1:14451"
+	member1Opts.Components = member1Comps
 	memberNode1 := &cluster.Node{
-		Options: cluster.Options{
-			AdvertiseAddr: "127.0.0.1:4450",
-			ClientAddr:    "127.0.0.1:14452",
-			Components:    member1Comps,
-		},
-		ServiceAddr: "127.0.0.1:14451",
+		Options: *member1Opts,
 	}
 	err = memberNode1.Startup()
 	c.Assert(err, IsNil)
@@ -83,14 +83,19 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(member1Handler.LocalService(), DeepEquals, []string{"GateComponent"})
 	c.Assert(member1Handler.RemoteService(), DeepEquals, []string{"MasterComponent"})
 
+	//监听
+	mux1 := http.NewServeMux()
+	mux1.Handle("/ws", memberNode1.WsHandler())
+	go http.ListenAndServe(":14452", mux1)
+
 	member2Comps := &component.Components{}
 	member2Comps.Register(&GameComponent{})
+	member2Opts := cluster.DefaultOptions()
+	member2Opts.AdvertiseAddr = "127.0.0.1:4450"
+	member2Opts.ServiceAddr = "127.0.0.1:24451"
+	member2Opts.Components = member2Comps
 	memberNode2 := &cluster.Node{
-		Options: cluster.Options{
-			AdvertiseAddr: "127.0.0.1:4450",
-			Components:    member2Comps,
-		},
-		ServiceAddr: "127.0.0.1:24451",
+		Options: *member2Opts,
 	}
 	err = memberNode2.Startup()
 	c.Assert(err, IsNil)
@@ -102,7 +107,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(member2Handler.LocalService(), DeepEquals, []string{"GameComponent"})
 	c.Assert(member2Handler.RemoteService(), DeepEquals, []string{"GateComponent", "MasterComponent"})
 
-	connector := io.NewConnector()
+	connector := ws.NewConnector()
 
 	chWait := make(chan struct{})
 	connector.OnConnected(func() {

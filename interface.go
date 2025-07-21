@@ -21,112 +21,112 @@
 package nano
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"syscall"
-	"time"
 
 	"github.com/lonng/nano/cluster"
-	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/runtime"
 	"github.com/lonng/nano/scheduler"
 )
-
-var running int32
 
 // VERSION returns current nano version
 var VERSION = "0.5.0"
 
-var (
-	// app represents the current server process
-	app = &struct {
-		name    string    // current application name
-		startAt time.Time // startup time
-	}{}
-)
+// Engine 引擎
+type Engine struct {
+	cluster.Options
+	running int32
+	node    *cluster.Node
+}
 
-// Listen listens on the TCP network address addr
-// and then calls Serve with handler to handle requests
-// on incoming connections.
-func Listen(addr string, opts ...Option) {
-	if atomic.AddInt32(&running, 1) != 1 {
-		log.Println("Nano has running")
-		return
+// New 创建引擎实例
+func New(opts ...Option) *Engine {
+	options := cluster.DefaultOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+	return &Engine{
+		Options: *options,
+		running: 0,
+	}
+}
+
+// Startup 启动引擎
+func (e *Engine) Startup() error {
+	if !atomic.CompareAndSwapInt32(&e.running, 0, 1) {
+		return errors.New("nano has running")
 	}
 
-	// application initialize
-	app.name = strings.TrimLeft(filepath.Base(os.Args[0]), "/")
-	app.startAt = time.Now()
-
-	// environment initialize
-	if wd, err := os.Getwd(); err != nil {
-		panic(err)
-	} else {
-		env.Wd, _ = filepath.Abs(wd)
-	}
-
-	opt := cluster.Options{
-		Components: &component.Components{},
-	}
-	for _, option := range opts {
-		option(&opt)
-	}
-
+	opts := &e.Options
 	// Use listen address as client address in non-cluster mode
-	if !opt.IsMaster && opt.AdvertiseAddr == "" && opt.ClientAddr == "" {
-		log.Println("The current server running in singleton mode")
-		opt.ClientAddr = addr
+	if opts.SingleMode() {
+		log.Println("Nano runs in singleton mode")
 	}
 
-	// Set the retry interval to 3 secondes if doesn't set by user
-	if opt.RetryInterval == 0 {
-		opt.RetryInterval = time.Second * 3
-	}
-
-	node := &cluster.Node{
-		Options:     opt,
-		ServiceAddr: addr,
-	}
-	err := node.Startup()
+	e.node = cluster.NewNode(opts)
+	err := e.node.Startup()
 	if err != nil {
-		log.Fatalf("Node startup failed: %v", err)
+		return fmt.Errorf("nano node Startup failed: %v", err)
 	}
-	runtime.CurrentNode = node
-
-	if node.ClientAddr != "" {
-		log.Println(fmt.Sprintf("Startup *Nano gate server* %s, client address: %v, service address: %s",
-			app.name, node.ClientAddr, node.ServiceAddr))
-	} else {
-		log.Println(fmt.Sprintf("Startup *Nano backend server* %s, service address %s",
-			app.name, node.ServiceAddr))
+	if e.node.ServiceAddr != "" {
+		log.Println(fmt.Sprintf("Nano server started grpc at %s", e.node.ServiceAddr))
 	}
-
 	go scheduler.Sched()
+	return nil
+}
+
+// Shutdown 发送信号并关闭 nano
+func (e *Engine) Shutdown() {
+	env.Close()
+	if e.node != nil {
+		e.node.Shutdown()
+	}
+	scheduler.Close()
+	atomic.StoreInt32(&e.running, 0)
+}
+
+// WsHandler 返回处理 WebSocket 连接的函数, 只有启动后才能获取
+func (e *Engine) WsHandler() http.Handler {
+	return e.node.WsHandler()
+}
+
+// Listen 启动 WebSocket 服务
+func (e *Engine) Listen(addr string, path string) error {
+	err := e.Startup()
+	if err != nil {
+		return err
+	}
+	mux := http.NewServeMux()
+	mux.Handle(path, e.WsHandler())
+	return http.ListenAndServe(addr, mux)
+}
+
+// Run 启动 grpc 服务 和 TCP 服务(指定了 TcpAddr), 并等待退出信号
+func (e *Engine) Run() error {
+	err := e.Startup()
+	if err != nil {
+		return err
+	}
+	e.Wait()
+	return nil
+}
+
+// Wait 等待退出信号
+func (e *Engine) Wait() {
 	sg := make(chan os.Signal)
 	signal.Notify(sg, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
-
 	select {
-	case <-env.Die:
-		log.Println("The app will shutdown in a few seconds")
+	case <-env.DieChan:
+		log.Println("Nano server will shutdown in a few seconds")
 	case s := <-sg:
 		log.Println("Nano server got signal", s)
 	}
-
 	log.Println("Nano server is stopping...")
-
-	node.Shutdown()
-	runtime.CurrentNode = nil
-	scheduler.Close()
-	atomic.StoreInt32(&running, 0)
-}
-
-// Shutdown send a signal to let 'nano' shutdown itself.
-func Shutdown() {
-	close(env.Die)
+	e.Shutdown()
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -133,6 +135,11 @@ func (mgr *RoomManager) Message(s *session.Session, msg *UserMessage) error {
 	return room.group.Broadcast("onMessage", msg)
 }
 
+func srcPath() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Dir(file)
+}
+
 func main() {
 	components := &component.Components{}
 	components.Register(
@@ -148,15 +155,22 @@ func main() {
 	pip.Inbound().PushBack(stats.inbound)
 
 	log.SetFlags(log.LstdFlags | log.Llongfile)
-	http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
 
-	nano.Listen(":3250",
-		nano.WithIsWebsocket(true),
+	e := nano.New(
 		nano.WithPipeline(pip),
-		nano.WithCheckOriginFunc(func(_ *http.Request) bool { return true }),
-		nano.WithWSPath("/nano"),
+		nano.WithCheckOrigin(func(_ *http.Request) bool { return true }),
 		nano.WithDebugMode(),
 		nano.WithSerializer(json.NewSerializer()), // override default serializer
 		nano.WithComponents(components),
 	)
+	err := e.Startup()
+	if err != nil {
+		return
+	}
+
+	webDir := filepath.Join(srcPath(), "web")
+	mux := http.NewServeMux()
+	mux.Handle("/nano", e.WsHandler())
+	mux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir(webDir))))
+	http.ListenAndServe(":3250", mux)
 }

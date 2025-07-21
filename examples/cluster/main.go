@@ -15,20 +15,18 @@ import (
 	"github.com/lonng/nano/serialize/json"
 	"github.com/lonng/nano/session"
 	"github.com/pingcap/errors"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "NanoClusterDemo"
-	app.Author = "Lonng"
-	app.Email = "heng@lonng.org"
 	app.Description = "Nano cluster demo"
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
 			Name: "master",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "listen,l",
 					Usage: "Master service listen address",
 					Value: "127.0.0.1:34567",
@@ -39,17 +37,17 @@ func main() {
 		{
 			Name: "gate",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "master",
 					Usage: "master server address",
 					Value: "127.0.0.1:34567",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "listen,l",
 					Usage: "Gate service listen address",
 					Value: "",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "gate-address",
 					Usage: "Client connect address",
 					Value: "",
@@ -60,12 +58,12 @@ func main() {
 		{
 			Name: "chat",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "master",
 					Usage: "master server address",
 					Value: "127.0.0.1:34567",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "listen,l",
 					Usage: "Chat service listen address",
 					Value: "",
@@ -107,8 +105,9 @@ func runMaster(args *cli.Context) error {
 	session.Lifetime.OnClosed(master.OnSessionClosed)
 
 	// Startup Nano server with the specified listen address
-	nano.Listen(listen,
+	engine := nano.New(
 		nano.WithMaster(),
+		nano.WithServiceAddr(listen),
 		nano.WithComponents(master.Services),
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithDebugMode(),
@@ -117,7 +116,7 @@ func runMaster(args *cli.Context) error {
 		}),
 	)
 
-	return nil
+	return engine.Run()
 }
 
 func runGate(args *cli.Context) error {
@@ -141,18 +140,17 @@ func runGate(args *cli.Context) error {
 	log.Println("Remote master server address", masterAddr)
 
 	// Startup Nano server with the specified listen address
-	nano.Listen(listen,
+	engine := nano.New(
 		nano.WithAdvertiseAddr(masterAddr),
-		nano.WithClientAddr(gateAddr),
+		nano.WithServiceAddr(listen),
 		nano.WithComponents(gate.Services),
 		nano.WithSerializer(json.NewSerializer()),
-		nano.WithIsWebsocket(true),
-		nano.WithWSPath("/nano"),
-		nano.WithCheckOriginFunc(func(_ *http.Request) bool { return true }),
+		nano.WithCheckOrigin(func(_ *http.Request) bool { return true }),
 		nano.WithDebugMode(),
 		nano.WithNodeId(2), // if you deploy multi gate, option set nodeId, default nodeId = os.Getpid()
 	)
-	return nil
+
+	return engine.Listen(gateAddr, "/nano")
 }
 
 func runChat(args *cli.Context) error {
@@ -173,12 +171,13 @@ func runChat(args *cli.Context) error {
 	session.Lifetime.OnClosed(chat.OnSessionClosed)
 
 	// Startup Nano server with the specified listen address
-	nano.Listen(listen,
+	engine := nano.New(
 		nano.WithAdvertiseAddr(masterAddr),
+		nano.WithServiceAddr(listen),
 		nano.WithComponents(chat.Services),
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithDebugMode(),
 	)
 
-	return nil
+	return engine.Run()
 }

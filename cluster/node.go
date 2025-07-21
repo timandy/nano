@@ -22,11 +22,9 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -42,28 +40,49 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Options contains some configurations for current node
+// Options 引擎选项
 type Options struct {
-	Pipeline           pipeline.Pipeline
-	IsMaster           bool
-	AdvertiseAddr      string
-	RetryInterval      time.Duration
-	ClientAddr         string
-	Components         *component.Components
-	Label              string
-	IsWebsocket        bool
-	TSLCertificate     string
-	TSLKey             string
-	UnregisterCallback func(Member)
-	RemoteServiceRoute CustomerRemoteServiceRoute
+	//握手
+	CheckOrigin        func(*http.Request) bool             //跨域检测, WebSocket 升级阶段
+	HandshakeValidator func(*session.Session, []byte) error //握手阶段回调
+
+	//工作
+	Pipeline   pipeline.Pipeline     //所有输入前置函数和输出前置函数
+	Components *component.Components //业务组件, 类似 Controller
+
+	//集群
+	IsMaster           bool                       //是否中心节点
+	TcpAddr            string                     //非 websocket 模式需要配置, 一般是 :Port
+	AdvertiseAddr      string                     //RPC 服务对外地址, 一般是 IP:Port; 子节点, 要配置这个值, 以便向 Master 注册子自身的 ServiceAddr
+	ServiceAddr        string                     //RPC 服务监听地址, 一般是 IP:Port; 主子节点都要配置这个值
+	RemoteServiceRoute CustomerRemoteServiceRoute //自定义节点路由规则
+	UnregisterCallback UnregisterCallback         //主节点可以配置回调
+	Label              string                     // 节点标签, 用于标识节点, 例如 "master", "slave-1", "slave-2" 等
 }
 
-// Node represents a node in nano cluster, which will contains a group of services.
-// All services will register to cluster and messages will be forwarded to the node
-// which provides respective service
+// DefaultOptions 默认选项
+func DefaultOptions() *Options {
+	return &Options{
+		//握手
+		CheckOrigin:        func(_ *http.Request) bool { return true },
+		HandshakeValidator: nil,
+		//工作
+		Components: &component.Components{},
+		//集群
+		IsMaster: false, //默认不是主节点
+	}
+}
+
+// SingleMode 是否单节点模式
+func (o *Options) SingleMode() bool {
+	//不是主节点 且 不是子节点
+	return !o.IsMaster && o.AdvertiseAddr == ""
+}
+
+// Node 表示 nano 集群中的一个节点，该节点将包含一组服务。
+// 所有服务都将注册到集群，消息将通过 grpc 转发到节点提供相应的服务。
 type Node struct {
-	Options            // current node options
-	ServiceAddr string // current server service address (RPC)
+	Options // current node options
 
 	cluster   *cluster
 	handler   *LocalHandler
@@ -77,13 +96,18 @@ type Node struct {
 	keepaliveExit chan struct{}
 }
 
-func (n *Node) Startup() error {
-	if n.ServiceAddr == "" {
-		return errors.New("service address cannot be empty in master node")
+// NewNode 创建新的节点
+func NewNode(opts *Options) *Node {
+	return &Node{
+		Options: *opts,
 	}
+}
+
+// Startup 启动节点
+func (n *Node) Startup() error {
 	n.sessions = map[int64]*session.Session{}
 	n.cluster = newCluster(n)
-	n.handler = NewHandler(n, n.Pipeline)
+	n.handler = NewHandler(n, n.Pipeline, &n.Options)
 	components := n.Components.List()
 	for _, c := range components {
 		err := n.handler.register(c.Comp, c.Opts)
@@ -105,17 +129,10 @@ func (n *Node) Startup() error {
 		c.Comp.AfterInit()
 	}
 
-	if n.ClientAddr != "" {
+	//tcp 协议直接开启监听, 如果是 websocket 模式, 则不需要开启监听, 通过 WSHandler() 依附于gin
+	if n.TcpAddr != "" {
 		go func() {
-			if n.IsWebsocket {
-				if len(n.TSLCertificate) != 0 {
-					n.listenAndServeWSTLS()
-				} else {
-					n.listenAndServeWS()
-				}
-			} else {
-				n.listenAndServe()
-			}
+			n.listenAndServe()
 		}()
 	}
 
@@ -127,9 +144,8 @@ func (n *Node) Handler() *LocalHandler {
 }
 
 func (n *Node) initNode() error {
-	// Current node is not master server and does not contains master
-	// address, so running in singleton mode
-	if !n.IsMaster && n.AdvertiseAddr == "" {
+	// 单节点模式
+	if n.SingleMode() {
 		return nil
 	}
 
@@ -182,8 +198,8 @@ func (n *Node) initNode() error {
 				n.cluster.initMembers(resp.Members)
 				break
 			}
-			log.Println("Register current node to cluster failed", err, "and will retry in", n.RetryInterval.String())
-			time.Sleep(n.RetryInterval)
+			log.Println("Register current node to cluster failed", err, "and will retry in", env.RetryInterval.String())
+			time.Sleep(env.RetryInterval)
 		}
 		n.once.Do(n.keepalive)
 	}
@@ -233,7 +249,7 @@ EXIT:
 
 // Enable current server accept connection
 func (n *Node) listenAndServe() {
-	listener, err := net.Listen("tcp", n.ClientAddr)
+	listener, err := net.Listen("tcp", n.TcpAddr)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -250,48 +266,20 @@ func (n *Node) listenAndServe() {
 	}
 }
 
-func (n *Node) listenAndServeWS() {
+func (n *Node) WsHandler() http.Handler {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     env.CheckOrigin,
+		CheckOrigin:     n.CheckOrigin,
 	}
-
-	http.HandleFunc("/"+strings.TrimPrefix(env.WSPath, "/"), func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(fmt.Sprintf("Upgrade failure, URI=%s, Error=%s", r.RequestURI, err.Error()))
 			return
 		}
-
 		n.handler.handleWS(conn)
 	})
-
-	if err := http.ListenAndServe(n.ClientAddr, nil); err != nil {
-		log.Fatal(err.Error())
-	}
-}
-
-func (n *Node) listenAndServeWSTLS() {
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     env.CheckOrigin,
-	}
-
-	http.HandleFunc("/"+strings.TrimPrefix(env.WSPath, "/"), func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println(fmt.Sprintf("Upgrade failure, URI=%s, Error=%s", r.RequestURI, err.Error()))
-			return
-		}
-
-		n.handler.handleWS(conn)
-	})
-
-	if err := http.ListenAndServeTLS(n.ClientAddr, n.TSLCertificate, n.TSLKey, nil); err != nil {
-		log.Fatal(err.Error())
-	}
 }
 
 func (n *Node) storeSession(s *session.Session) {
@@ -429,29 +417,12 @@ func (n *Node) keepalive() {
 	if n.AdvertiseAddr == "" || n.IsMaster {
 		return
 	}
-	heartbeat := func() {
-		pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
-		if err != nil {
-			log.Println("rpcClient master conn", err)
-			return
-		}
-		masterCli := clusterpb.NewMasterClient(pool.Get())
-		if _, err := masterCli.Heartbeat(context.Background(), &clusterpb.HeartbeatRequest{
-			MemberInfo: &clusterpb.MemberInfo{
-				Label:       n.Label,
-				ServiceAddr: n.ServiceAddr,
-				Services:    n.handler.LocalService(),
-			},
-		}); err != nil {
-			log.Println("Member send heartbeat error", err)
-		}
-	}
 	go func() {
-		ticker := time.NewTicker(env.Heartbeat)
+		ticker := time.NewTicker(env.HeartbeatInterval)
 		for {
 			select {
 			case <-ticker.C:
-				heartbeat()
+				n.heartbeat()
 			case <-n.keepaliveExit:
 				log.Println("Exit member node heartbeat ")
 				ticker.Stop()
@@ -459,4 +430,22 @@ func (n *Node) keepalive() {
 			}
 		}
 	}()
+}
+
+func (n *Node) heartbeat() {
+	pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
+	if err != nil {
+		log.Println("rpcClient master conn", err)
+		return
+	}
+	masterCli := clusterpb.NewMasterClient(pool.Get())
+	if _, err := masterCli.Heartbeat(context.Background(), &clusterpb.HeartbeatRequest{
+		MemberInfo: &clusterpb.MemberInfo{
+			Label:       n.Label,
+			ServiceAddr: n.ServiceAddr,
+			Services:    n.handler.LocalService(),
+		},
+	}); err != nil {
+		log.Println("Member send heartbeat error", err)
+	}
 }

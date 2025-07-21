@@ -18,10 +18,10 @@ go build
 ## open browser and visit url for 4 times
 
 ```
-http://127.0.0.1:12345/web/ 
-http://127.0.0.1:12345/web/ 
-http://127.0.0.1:12345/web/ 
-http://127.0.0.1:12345/web/     
+http://127.0.0.1:12345/web/
+http://127.0.0.1:12345/web/
+http://127.0.0.1:12345/web/
+http://127.0.0.1:12345/web/
 ```
 
 input content and send, the same ChatRoomService node will sync the message each other

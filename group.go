@@ -27,7 +27,6 @@ import (
 
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/session"
 )
 
@@ -105,7 +104,7 @@ func (c *Group) Multicast(route string, v any, filter SessionFilter) error {
 		return ErrClosedGroup
 	}
 
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -135,7 +134,7 @@ func (c *Group) Broadcast(route string, v any) error {
 		return ErrClosedGroup
 	}
 
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}

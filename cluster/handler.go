@@ -22,7 +22,6 @@ package cluster
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net"
@@ -35,7 +34,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/component"
-	"github.com/lonng/nano/internal/codec"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
@@ -45,56 +43,13 @@ import (
 	"github.com/lonng/nano/session"
 )
 
-var (
-	// cached serialized data
-	hrd []byte // handshake response data
-	hbd []byte // heartbeat packet data
-)
-
 type rpcHandler func(session *session.Session, msg *message.Message, noCopy bool)
 
 // CustomerRemoteServiceRoute customer remote service route
 type CustomerRemoteServiceRoute func(service string, session *session.Session, members []*clusterpb.MemberInfo) *clusterpb.MemberInfo
 
-func cache() {
-	hrdata := map[string]any{
-		"code": 200,
-		"sys": map[string]any{
-			"heartbeat":  env.Heartbeat.Seconds(),
-			"servertime": time.Now().UTC().Unix(),
-		},
-	}
-	if dict, ok := message.GetDictionary(); ok {
-		hrdata = map[string]any{
-			"code": 200,
-			"sys": map[string]any{
-				"heartbeat":  env.Heartbeat.Seconds(),
-				"servertime": time.Now().UTC().Unix(),
-				"dict":       dict,
-			},
-		}
-	}
-	// data, err := json.Marshal(map[string]any{
-	// 	"code": 200,
-	// 	"sys": map[string]float64{
-	// 		"heartbeat": env.Heartbeat.Seconds(),
-	// 	},
-	// })
-	data, err := json.Marshal(hrdata)
-	if err != nil {
-		panic(err)
-	}
-
-	hrd, err = codec.Encode(packet.Handshake, data)
-	if err != nil {
-		panic(err)
-	}
-
-	hbd, err = codec.Encode(packet.Heartbeat, nil)
-	if err != nil {
-		panic(err)
-	}
-}
+// UnregisterCallback 取消注册的回调
+type UnregisterCallback func(Member)
 
 type LocalHandler struct {
 	localServices map[string]*component.Service // all registered service
@@ -105,15 +60,17 @@ type LocalHandler struct {
 
 	pipeline    pipeline.Pipeline
 	currentNode *Node
+	opts        *Options
 }
 
-func NewHandler(currentNode *Node, pipeline pipeline.Pipeline) *LocalHandler {
+func NewHandler(currentNode *Node, pipeline pipeline.Pipeline, opts *Options) *LocalHandler {
 	h := &LocalHandler{
 		localServices:  make(map[string]*component.Service),
 		localHandlers:  make(map[string]*component.Handler),
 		remoteServices: map[string][]*clusterpb.MemberInfo{},
 		pipeline:       pipeline,
 		currentNode:    currentNode,
+		opts:           opts,
 	}
 
 	return h
@@ -279,11 +236,14 @@ func (h *LocalHandler) handle(conn net.Conn) {
 func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 	switch p.Type {
 	case packet.Handshake:
-		if err := env.HandshakeValidator(agent.session, p.Data); err != nil {
-			return err
+		validator := h.opts.HandshakeValidator
+		if validator != nil {
+			if err := validator(agent.session, p.Data); err != nil {
+				return err
+			}
 		}
 
-		if _, err := agent.conn.Write(hrd); err != nil {
+		if _, err := agent.conn.Write(getHsd()); err != nil {
 			return err
 		}
 
@@ -452,7 +412,7 @@ func (h *LocalHandler) localProcess(handler *component.Handler, lastMid uint64, 
 		data = payload
 	} else {
 		data = reflect.New(handler.Type.Elem()).Interface()
-		err := env.Serializer.Unmarshal(payload, data)
+		err := env.Unmarshal(payload, data)
 		if err != nil {
 			log.Println(fmt.Sprintf("Deserialize to %T failed: %+v (%v)", data, err, payload))
 			return

@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/lonng/nano/cluster/clusterpb"
+	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/mock"
 	"github.com/lonng/nano/session"
@@ -22,7 +23,7 @@ type acceptor struct {
 // Push implements the session.NetworkEntity interface
 func (a *acceptor) Push(route string, v any) error {
 	// TODO: buffer
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func (a *acceptor) Push(route string, v any) error {
 // RPC implements the session.NetworkEntity interface
 func (a *acceptor) RPC(route string, v any) error {
 	// TODO: buffer
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (a *acceptor) Response(v any) error {
 // ResponseMid implements the session.NetworkEntity interface
 func (a *acceptor) ResponseMid(mid uint64, v any) error {
 	// TODO: buffer
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -88,6 +89,6 @@ func (a *acceptor) Close() error {
 }
 
 // RemoteAddr implements the session.NetworkEntity interface
-func (*acceptor) RemoteAddr() net.Addr {
+func (a *acceptor) RemoteAddr() net.Addr {
 	return mock.NetAddr{}
 }

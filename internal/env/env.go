@@ -20,44 +20,72 @@
 
 // env represents the environment of the current process, includes
 // work path and config path etc.
+
 package env
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/lonng/nano/serialize"
 	"github.com/lonng/nano/serialize/protobuf"
-	"github.com/lonng/nano/session"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
+//goland:noinspection GoVarAndConstTypeMayBeOmitted,GoCommentStart
 var (
-	Wd                 string                               // working path
-	Die                chan bool                            // wait for end application
-	Heartbeat          time.Duration                        // Heartbeat internal
-	CheckOrigin        func(*http.Request) bool             // check origin when websocket enabled
-	Debug              bool                                 // enable Debug
-	WSPath             string                               // WebSocket path(eg: ws://127.0.0.1/WSPath)
-	HandshakeValidator func(*session.Session, []byte) error // When you need to verify the custom data of the handshake request
-
-	// timerPrecision indicates the precision of timer, default is time.Second
-	TimerPrecision = time.Second
-
-	// globalTicker represents global ticker that all cron job will be executed
-	// in globalTicker.
-	GlobalTicker *time.Ticker
-
-	Serializer serialize.Serializer
-
-	GrpcOptions = []grpc.DialOption{grpc.WithInsecure()}
+	Debug          bool                 = false                    //调试模式
+	DieChan        chan bool            = make(chan bool)          //等待停止的 chan
+	Serializer     serialize.Serializer = protobuf.NewSerializer() //序列化器, 对象和字节转换
+	TimerPrecision time.Duration        = time.Second              //定时器精度
+	//集群
+	RetryInterval     time.Duration     = 3 * time.Second    //子节点向 Master 注册失败后, 重试间隔时间, 默认 3s
+	HeartbeatInterval time.Duration     = 30 * time.Second   //子节点向 Master 定时心跳请求间隔
+	GrpcOptions       []grpc.DialOption = []grpc.DialOption{ //子节点的 GRPC 客户端的连接选项
+		grpc.WithTransportCredentials(insecure.NewCredentials()),                       //非 TLS
+		grpc.WithConnectParams(grpc.ConnectParams{MinConnectTimeout: 2 * time.Second}), //连接参数
+	}
 )
 
-func init() {
-	Die = make(chan bool)
-	Heartbeat = 30 * time.Second
-	Debug = false
-	CheckOrigin = func(_ *http.Request) bool { return true }
-	HandshakeValidator = func(_ *session.Session, _ []byte) error { return nil }
-	Serializer = protobuf.NewSerializer()
+// Marshal 序列化数据
+func Marshal(v any) ([]byte, error) {
+	switch raw := v.(type) {
+	case []byte:
+		return raw, nil
+	case string:
+		return []byte(raw), nil
+	case *string:
+		if raw == nil {
+			return []byte{}, nil
+		}
+		return []byte(*raw), nil
+	default:
+		return Serializer.Marshal(v)
+	}
+}
+
+// Unmarshal 反序列化数据
+func Unmarshal(data []byte, v any) error {
+	switch raw := v.(type) {
+	case *[]byte:
+		*raw = data
+		return nil
+	case *string:
+		*raw = string(data)
+		return nil
+	case **string:
+		s := string(data)
+		*raw = &s
+		return nil
+	default:
+		return Serializer.Unmarshal(data, v)
+	}
+}
+
+// Close 关闭 DieChan 通道, 以便其他组件可以监听到
+func Close() {
+	defer func() {
+		recover()
+	}()
+	close(DieChan)
 }

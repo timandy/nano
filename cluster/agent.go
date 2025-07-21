@@ -112,7 +112,7 @@ func (a *agent) LastMid() uint64 {
 	return a.lastMid
 }
 
-// Push, implementation for session.NetworkEntity interface
+// Push implementation for session.NetworkEntity interface
 func (a *agent) Push(route string, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
@@ -125,25 +125,23 @@ func (a *agent) Push(route string, v any) error {
 	if env.Debug {
 		switch d := v.(type) {
 		case []byte:
-			log.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%dbytes",
-				a.session.ID(), a.session.UID(), route, len(d)))
+			log.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%dbytes", a.session.ID(), a.session.UID(), route, len(d)))
 		default:
-			log.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%+v",
-				a.session.ID(), a.session.UID(), route, v))
+			log.Println(fmt.Sprintf("Type=Push, ID=%d, UID=%d, Route=%s, Data=%+v", a.session.ID(), a.session.UID(), route, v))
 		}
 	}
 
 	return a.send(pendingMessage{typ: message.Push, route: route, payload: v})
 }
 
-// RPC, implementation for session.NetworkEntity interface
+// RPC implementation for session.NetworkEntity interface
 func (a *agent) RPC(route string, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
 	}
 
 	// TODO: buffer
-	data, err := message.Serialize(v)
+	data, err := env.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -237,7 +235,8 @@ func (a *agent) setStatus(state int32) {
 }
 
 func (a *agent) write() {
-	ticker := time.NewTicker(env.Heartbeat)
+	heartbeat := env.HeartbeatInterval
+	ticker := time.NewTicker(heartbeat)
 	chWrite := make(chan []byte, agentWriteBacklog)
 	// clean func
 	defer func() {
@@ -253,12 +252,12 @@ func (a *agent) write() {
 	for {
 		select {
 		case <-ticker.C:
-			deadline := time.Now().Add(-2 * env.Heartbeat).Unix()
+			deadline := time.Now().Add(-2 * heartbeat).Unix()
 			if atomic.LoadInt64(&a.lastAt) < deadline {
 				log.Println(fmt.Sprintf("Session heartbeat timeout, LastTime=%d, Deadline=%d", atomic.LoadInt64(&a.lastAt), deadline))
 				return
 			}
-			chWrite <- hbd
+			chWrite <- getHbd()
 
 		case data := <-chWrite:
 			// close agent while low-level conn broken
@@ -268,7 +267,7 @@ func (a *agent) write() {
 			}
 
 		case data := <-a.chSend:
-			payload, err := message.Serialize(data.payload)
+			payload, err := env.Marshal(data.payload)
 			if err != nil {
 				switch data.typ {
 				case message.Push:
@@ -313,7 +312,7 @@ func (a *agent) write() {
 		case <-a.chDie: // agent closed signal
 			return
 
-		case <-env.Die: // application quit
+		case <-env.DieChan: // application quit
 			return
 		}
 	}

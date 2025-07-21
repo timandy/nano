@@ -46,7 +46,7 @@ type cluster struct {
 func newCluster(currentNode *Node) *cluster {
 	c := &cluster{currentNode: currentNode}
 	if currentNode.IsMaster {
-		c.checkMemberHeartbeat()
+		c.startHeartbeatTimer()
 	}
 	return c
 }
@@ -185,37 +185,39 @@ func (c *cluster) Heartbeat(_ context.Context, req *clusterpb.HeartbeatRequest) 
 	return &clusterpb.HeartbeatResponse{}, nil
 }
 
-func (c *cluster) checkMemberHeartbeat() {
-	check := func() {
-		unregisterMembers := make([]*Member, 0)
-		// check heartbeat time
-		for _, m := range c.members {
-			if time.Now().Sub(m.lastHeartbeatAt) > 4*env.Heartbeat && !m.isMaster {
-				unregisterMembers = append(unregisterMembers, m)
-			}
-		}
-
-		for _, m := range unregisterMembers {
-			if _, err := c.Unregister(context.Background(), &clusterpb.UnregisterRequest{
-				ServiceAddr: m.MemberInfo().ServiceAddr,
-			}); err != nil {
-				log.Println("Heartbeat unregister error", err)
-			}
-		}
+func (c *cluster) startHeartbeatTimer() {
+	if !c.currentNode.IsMaster {
+		return
 	}
+
 	go func() {
-		ticker := time.NewTicker(env.Heartbeat)
+		ticker := time.NewTicker(env.HeartbeatInterval)
 		for {
 			select {
 			case <-ticker.C:
-				if !c.currentNode.IsMaster {
-					ticker.Stop()
-					return
-				}
-				check()
+				c.checkHeartbeat()
 			}
 		}
 	}()
+}
+
+func (c *cluster) checkHeartbeat() {
+	unregisterMembers := make([]*Member, 0)
+	// check heartbeat time
+	for _, m := range c.members {
+		if time.Now().Sub(m.lastHeartbeatAt) > 4*env.HeartbeatInterval && !m.isMaster {
+			unregisterMembers = append(unregisterMembers, m)
+		}
+	}
+
+	for _, m := range unregisterMembers {
+		req := &clusterpb.UnregisterRequest{
+			ServiceAddr: m.MemberInfo().ServiceAddr,
+		}
+		if _, err := c.Unregister(context.Background(), req); err != nil {
+			log.Println("Heartbeat unregister error", err)
+		}
+	}
 }
 
 func (c *cluster) setRpcClient(client *rpcClient) {

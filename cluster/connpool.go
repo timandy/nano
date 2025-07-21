@@ -21,11 +21,9 @@
 package cluster
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/lonng/nano/internal/env"
 	"google.golang.org/grpc"
@@ -55,20 +53,13 @@ func newConnArray(maxSize uint, addr string) (*connPool, error) {
 
 func (a *connPool) init(addr string) error {
 	for i := range a.v {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		conn, err := grpc.DialContext(
-			ctx,
-			addr,
-			env.GrpcOptions...,
-		)
-		cancel()
+		conn, err := grpc.NewClient(addr, env.GrpcOptions...)
 		if err != nil {
 			// Cleanup if the initialization fails.
 			a.Close()
 			return err
 		}
 		a.v[i] = conn
-
 	}
 	return nil
 }

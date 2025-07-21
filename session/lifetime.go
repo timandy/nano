@@ -21,7 +21,7 @@ func (lt *lifetime) OnClosed(h LifetimeHandler) {
 }
 
 func (lt *lifetime) Close(s *Session) {
-	if len(lt.onClosed) < 1 {
+	if len(lt.onClosed) == 0 {
 		return
 	}
 

@@ -30,11 +30,6 @@ import (
 	"github.com/lonng/nano/internal/log"
 )
 
-const (
-	messageQueueBacklog = 1 << 10
-	sessionCloseBacklog = 1 << 8
-)
-
 // LocalScheduler schedules task to a customized goroutine
 type LocalScheduler interface {
 	Schedule(Task)
@@ -62,7 +57,7 @@ func try(f func()) {
 }
 
 func Sched() {
-	if atomic.AddInt32(&started, 1) != 1 {
+	if !atomic.CompareAndSwapInt32(&started, 0, 1) {
 		return
 	}
 

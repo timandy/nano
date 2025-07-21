@@ -18,160 +18,153 @@ import (
 
 type Option func(*cluster.Options)
 
+//==== 基本
+
+// WithDebugMode 启用调试
+func WithDebugMode() Option {
+	return func(opt *cluster.Options) {
+		env.Debug = true
+	}
+}
+
+// WithLogger 设置日志
+func WithLogger(logger log.Logger) Option {
+	return func(opt *cluster.Options) {
+		log.SetLogger(logger)
+	}
+}
+
+//==== 握手
+
+// WithCheckOrigin 设置跨域检查函数
+func WithCheckOrigin(fn func(*http.Request) bool) Option {
+	return func(opt *cluster.Options) {
+		opt.CheckOrigin = fn
+	}
+}
+
+// WithHandshakeValidator 设置握手校验函数
+func WithHandshakeValidator(fn func(*session.Session, []byte) error) Option {
+	return func(opt *cluster.Options) {
+		opt.HandshakeValidator = fn
+	}
+}
+
+//==== 工作
+
+// WithPipeline 所有输入前置函数和输出前置函数
 func WithPipeline(pipeline pipeline.Pipeline) Option {
 	return func(opt *cluster.Options) {
 		opt.Pipeline = pipeline
 	}
 }
 
-// WithCustomerRemoteServiceRoute register remote service route
-func WithCustomerRemoteServiceRoute(route cluster.CustomerRemoteServiceRoute) Option {
-	return func(opt *cluster.Options) {
-		opt.RemoteServiceRoute = route
-	}
-}
-
-// WithAdvertiseAddr sets the advertise address option, it will be the listen address in
-// master node and an advertise address which cluster member to connect
-func WithAdvertiseAddr(addr string, retryInterval ...time.Duration) Option {
-	return func(opt *cluster.Options) {
-		opt.AdvertiseAddr = addr
-		if len(retryInterval) > 0 {
-			opt.RetryInterval = retryInterval[0]
-		}
-	}
-}
-
-// WithMemberAddr sets the listen address which is used to establish connection between
-// cluster members. Will select an available port automatically if no member address
-// setting and panic if no available port
-func WithClientAddr(addr string) Option {
-	return func(opt *cluster.Options) {
-		opt.ClientAddr = addr
-	}
-}
-
-// WithMaster sets the option to indicate whether the current node is master node
-func WithMaster() Option {
-	return func(opt *cluster.Options) {
-		opt.IsMaster = true
-	}
-}
-
-// WithGrpcOptions sets the grpc dial options
-func WithGrpcOptions(opts ...grpc.DialOption) Option {
-	return func(_ *cluster.Options) {
-		env.GrpcOptions = append(env.GrpcOptions, opts...)
-	}
-}
-
-// WithComponents sets the Components
+// WithComponents 设置业务路由组件
 func WithComponents(components *component.Components) Option {
 	return func(opt *cluster.Options) {
 		opt.Components = components
 	}
 }
 
-// WithHeartbeatInterval sets Heartbeat time interval
-func WithHeartbeatInterval(d time.Duration) Option {
-	return func(_ *cluster.Options) {
-		env.Heartbeat = d
-	}
-}
-
-// WithCheckOriginFunc sets the function that check `Origin` in http headers
-func WithCheckOriginFunc(fn func(*http.Request) bool) Option {
-	return func(opt *cluster.Options) {
-		env.CheckOrigin = fn
-	}
-}
-
-// WithDebugMode let 'nano' to run under Debug mode.
-func WithDebugMode() Option {
-	return func(_ *cluster.Options) {
-		env.Debug = true
-	}
-}
-
-// SetDictionary sets routes map
-func WithDictionary(dict map[string]uint16) Option {
-	return func(_ *cluster.Options) {
-		message.SetDictionary(dict)
-	}
-}
-
-func WithWSPath(path string) Option {
-	return func(_ *cluster.Options) {
-		env.WSPath = path
-	}
-}
-
-// SetTimerPrecision sets the ticker precision, and time precision can not less
-// than a Millisecond, and can not change after application running. The default
-// precision is time.Second
-func WithTimerPrecision(precision time.Duration) Option {
-	if precision < time.Millisecond {
-		panic("time precision can not less than a Millisecond")
-	}
-	return func(_ *cluster.Options) {
-		env.TimerPrecision = precision
-	}
-}
-
-// WithSerializer customizes application serializer, which automatically Marshal
-// and UnMarshal handler payload
+// WithSerializer 设置序列化器
 func WithSerializer(serializer serialize.Serializer) Option {
 	return func(opt *cluster.Options) {
 		env.Serializer = serializer
 	}
 }
 
-// WithLabel sets the current node label in cluster
+// WithTimerPrecision 定时器精度, 不能小于 1 毫秒
+func WithTimerPrecision(precision time.Duration) Option {
+	if precision < time.Millisecond {
+		panic("time precision can not less than a Millisecond")
+	}
+	return func(opt *cluster.Options) {
+		env.TimerPrecision = precision
+	}
+}
+
+// WithRouteDict 设置路由字典
+func WithRouteDict(dict map[string]uint16) Option {
+	return func(opt *cluster.Options) {
+		message.SetRouteDict(dict)
+	}
+}
+
+//==== 集群
+
+// WithMaster 设置当前为 master 节点
+func WithMaster() Option {
+	return func(opt *cluster.Options) {
+		opt.IsMaster = true
+	}
+}
+
+// WithTcpAddr 监听 tcp 协议的时候需要配置, 一般只配置Prot 例如 :Port
+func WithTcpAddr(addr string) Option {
+	return func(opt *cluster.Options) {
+		opt.TcpAddr = addr
+	}
+}
+
+// WithAdvertiseAddr 集群模式, 子节点, 要配置这个值, 以便向 Master 注册子自身的 ServiceAddr
+func WithAdvertiseAddr(addr string) Option {
+	return func(opt *cluster.Options) {
+		opt.AdvertiseAddr = addr
+	}
+}
+
+// WithServiceAddr 集群模式, 主子节点都要配置该值, 以便启用 grpc 监听
+func WithServiceAddr(addr string) Option {
+	return func(opt *cluster.Options) {
+		opt.ServiceAddr = addr
+	}
+}
+
+// WithRetryInterval 子节点向 Master 注册失败后, 重试间隔时间
+func WithRetryInterval(interval time.Duration) Option {
+	return func(opt *cluster.Options) {
+		env.RetryInterval = interval
+	}
+}
+
+// WithHeartbeatInterval 子节点向 Master 定时心跳请求间隔
+func WithHeartbeatInterval(d time.Duration) Option {
+	return func(opt *cluster.Options) {
+		env.HeartbeatInterval = d
+	}
+}
+
+// WithGrpcOptions 自建店的 Grpc 客户端连接选项
+func WithGrpcOptions(opts ...grpc.DialOption) Option {
+	return func(opt *cluster.Options) {
+		env.GrpcOptions = append(env.GrpcOptions, opts...)
+	}
+}
+
+// WithRemoteServiceRoute 自定义节点路由规则
+func WithRemoteServiceRoute(route cluster.CustomerRemoteServiceRoute) Option {
+	return func(opt *cluster.Options) {
+		opt.RemoteServiceRoute = route
+	}
+}
+
+// WithUnregisterCallback 主节点可以配置回调
+func WithUnregisterCallback(fn cluster.UnregisterCallback) Option {
+	return func(opt *cluster.Options) {
+		opt.UnregisterCallback = fn
+	}
+}
+
+// WithLabel 设置节点标签
 func WithLabel(label string) Option {
 	return func(opt *cluster.Options) {
 		opt.Label = label
 	}
 }
 
-// WithIsWebsocket indicates whether current node WebSocket is enabled
-func WithIsWebsocket(enableWs bool) Option {
-	return func(opt *cluster.Options) {
-		opt.IsWebsocket = enableWs
-	}
-}
-
-// WithTSLConfig sets the `key` and `certificate` of TSL
-func WithTSLConfig(certificate, key string) Option {
-	return func(opt *cluster.Options) {
-		opt.TSLCertificate = certificate
-		opt.TSLKey = key
-	}
-}
-
-// WithLogger overrides the default logger
-func WithLogger(l log.Logger) Option {
-	return func(opt *cluster.Options) {
-		log.SetLogger(l)
-	}
-}
-
-// WithHandshakeValidator sets the function that Verify `handshake` data
-func WithHandshakeValidator(fn func(*session.Session, []byte) error) Option {
-	return func(opt *cluster.Options) {
-		env.HandshakeValidator = fn
-	}
-}
-
-// WithNodeId set nodeId use snowflake nodeId generate sessionId, default: pid
+// WithNodeId 使用 snowFlake 算法生成 sessionId 的时候, 使用此设置作为 workerId
 func WithNodeId(nodeId uint64) Option {
 	return func(opt *cluster.Options) {
 		service.ResetNodeId(nodeId)
-	}
-}
-
-// WithUnregisterCallback master unregister member event call fn
-func WithUnregisterCallback(fn func(member cluster.Member)) Option {
-	return func(opt *cluster.Options) {
-		opt.UnregisterCallback = fn
 	}
 }

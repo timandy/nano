@@ -1,10 +1,11 @@
 //go:build benchmark
 // +build benchmark
 
-package io
+package ws
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -58,11 +59,17 @@ func server() {
 	components.Register(NewTestHandler())
 
 	e := nano.New(nano.WithDebugMode(),
-		nano.WithTcpAddr(addr),
 		nano.WithSerializer(protobuf.NewSerializer()),
 		nano.WithComponents(components),
 	)
-	e.Run()
+	err := e.Startup()
+	if err != nil {
+		return
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/ws", e.WsHandler())
+	http.ListenAndServe(addr, mux)
 }
 
 func client() {
