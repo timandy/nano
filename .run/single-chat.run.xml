@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="single-chat" type="GoApplicationRunConfiguration" factoryName="Go Application">
+        <module name="nano"/>
+        <working_directory value="$PROJECT_DIR$"/>
+        <kind value="FILE"/>
+        <package value="github.com/lonng/nano"/>
+        <directory value="$PROJECT_DIR$"/>
+        <filePath value="$PROJECT_DIR$/examples/demo/chat/main.go"/>
+        <method v="2"/>
+    </configuration>
+</component>

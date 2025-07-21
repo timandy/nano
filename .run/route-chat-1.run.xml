@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="route-chat-1" type="GoApplicationRunConfiguration" factoryName="Go Application">
+        <module name="nano"/>
+        <working_directory value="$PROJECT_DIR$"/>
+        <parameters value="chat --listen &quot;127.0.0.1:34580&quot;"/>
+        <kind value="PACKAGE"/>
+        <package value="github.com/lonng/nano/examples/customerroute"/>
+        <directory value="$PROJECT_DIR$"/>
+        <filePath value="$PROJECT_DIR$/examples/customerroute/main.go"/>
+        <method v="2"/>
+    </configuration>
+</component>
