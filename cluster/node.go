@@ -139,10 +139,12 @@ func (n *Node) Startup() error {
 	return nil
 }
 
+// Handler 返回当前节点的本地处理器
 func (n *Node) Handler() *LocalHandler {
 	return n.handler
 }
 
+// initNode 初始化节点的 grpc 服务
 func (n *Node) initNode() error {
 	// 单节点模式
 	if n.SingleMode() {
@@ -213,8 +215,7 @@ func (n *Node) registerServices() {
 	}
 }
 
-// Shutdowns all components registered by application, that
-// call by reverse order against register
+// Shutdown 停止应用程序注册的所有组件，倒序调用组件的关闭方法，从 master 节点取消注册
 func (n *Node) Shutdown() {
 	// reverse call `BeforeShutdown` hooks
 	components := n.Components.List()
@@ -254,7 +255,7 @@ EXIT:
 	}
 }
 
-// Enable current server accept connection
+// listenAndServe 启动 tcp/ip 监听
 func (n *Node) listenAndServe() {
 	listener, err := net.Listen("tcp", n.TcpAddr)
 	if err != nil {
@@ -273,6 +274,7 @@ func (n *Node) listenAndServe() {
 	}
 }
 
+// WsHandler 返回一个 http.Handler 用于处理 WebSocket 连接
 func (n *Node) WsHandler() http.Handler {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
