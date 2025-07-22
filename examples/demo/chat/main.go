@@ -127,7 +127,8 @@ func (mgr *RoomManager) Join(s *session.Session, msg []byte) error {
 }
 
 // Message sync last message to all members
-func (mgr *RoomManager) Message(s *session.Session, msg *UserMessage) error {
+func (mgr *RoomManager) Message(s *session.Session, msg *UserMessage, msg2 UserMessage) error {
+	_ = msg2
 	if !s.HasKey(roomIDKey) {
 		return fmt.Errorf("not join room yet")
 	}

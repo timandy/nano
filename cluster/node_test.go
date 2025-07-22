@@ -28,7 +28,7 @@ func (c *MasterComponent) Test(session *session.Session, _ []byte) error {
 	return session.Push("test", &testdata.Pong{Content: "master server pong"})
 }
 
-func (c *GateComponent) Test(session *session.Session, ping *testdata.Ping) error {
+func (c *GateComponent) Test(session *session.Session, ping testdata.Ping) error {
 	return session.Push("test", &testdata.Pong{Content: "gate server pong"})
 }
 
@@ -52,6 +52,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	go scheduler.Sched()
 	defer scheduler.Close()
 
+	//注册中心
 	masterComps := &component.Components{}
 	masterComps.Register(&MasterComponent{})
 	masterOpts := cluster.DefaultOptions()
@@ -59,13 +60,13 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	masterOpts.Components = masterComps
 	masterOpts.ServiceAddr = "127.0.0.1:4450"
 	masterNode := &cluster.Node{
-		Options: *masterOpts,
+		Options: masterOpts,
 	}
 	err := masterNode.Startup()
 	c.Assert(err, IsNil)
 	masterHandler := masterNode.Handler()
 	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
-
+	//网关
 	member1Comps := &component.Components{}
 	member1Comps.Register(&GateComponent{})
 	member1Opts := cluster.DefaultOptions()
@@ -73,7 +74,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	member1Opts.ServiceAddr = "127.0.0.1:14451"
 	member1Opts.Components = member1Comps
 	memberNode1 := &cluster.Node{
-		Options: *member1Opts,
+		Options: member1Opts,
 	}
 	err = memberNode1.Startup()
 	c.Assert(err, IsNil)
@@ -82,12 +83,11 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(masterHandler.RemoteService(), DeepEquals, []string{"GateComponent"})
 	c.Assert(member1Handler.LocalService(), DeepEquals, []string{"GateComponent"})
 	c.Assert(member1Handler.RemoteService(), DeepEquals, []string{"MasterComponent"})
-
-	//监听
+	//网关监听
 	mux1 := http.NewServeMux()
 	mux1.Handle("/ws", memberNode1.WsHandler())
 	go http.ListenAndServe(":14452", mux1)
-
+	//游戏
 	member2Comps := &component.Components{}
 	member2Comps.Register(&GameComponent{})
 	member2Opts := cluster.DefaultOptions()
@@ -95,7 +95,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	member2Opts.ServiceAddr = "127.0.0.1:24451"
 	member2Opts.Components = member2Comps
 	memberNode2 := &cluster.Node{
-		Options: *member2Opts,
+		Options: member2Opts,
 	}
 	err = memberNode2.Startup()
 	c.Assert(err, IsNil)
@@ -107,6 +107,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(member2Handler.LocalService(), DeepEquals, []string{"GameComponent"})
 	c.Assert(member2Handler.RemoteService(), DeepEquals, []string{"GateComponent", "MasterComponent"})
 
+	//客户端
 	connector := ws.NewConnector()
 
 	chWait := make(chan struct{})

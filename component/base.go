@@ -20,8 +20,17 @@
 
 package component
 
+import (
+	"github.com/lonng/nano/nap"
+)
+
+var _ Component = (*Base)(nil)
+
 // Base implements a default component for Component.
-type Base struct{}
+type Base struct {
+}
+
+func (c *Base) Register(nap.IRoutes) {}
 
 // Init was called to initialize the component.
 func (c *Base) Init() {}

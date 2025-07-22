@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -38,6 +37,7 @@ import (
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
+	"github.com/lonng/nano/nap"
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
@@ -53,30 +53,49 @@ type UnregisterCallback func(Member)
 
 type LocalHandler struct {
 	localServices map[string]*component.Service // all registered service
-	localHandlers map[string]*component.Handler // all handler method
+	localHandlers nap.HandlerTrees              // all handler methods
+	allNoRoutes   *nap.HandlerNode              // no routes handler methods
 
 	mu             sync.RWMutex
 	remoteServices map[string][]*clusterpb.MemberInfo
 
-	pipeline    pipeline.Pipeline
 	currentNode *Node
+	pipeline    pipeline.Pipeline
 	opts        *Options
 }
 
-func NewHandler(currentNode *Node, pipeline pipeline.Pipeline, opts *Options) *LocalHandler {
-	h := &LocalHandler{
+func NewHandler(currentNode *Node) *LocalHandler {
+	engine := currentNode.engine
+	return &LocalHandler{
 		localServices:  make(map[string]*component.Service),
-		localHandlers:  make(map[string]*component.Handler),
+		localHandlers:  getTrees(engine),
+		allNoRoutes:    getAllNoRoutes(engine),
 		remoteServices: map[string][]*clusterpb.MemberInfo{},
-		pipeline:       pipeline,
 		currentNode:    currentNode,
-		opts:           opts,
+		pipeline:       currentNode.Pipeline,
+		opts:           currentNode.Options,
 	}
-
-	return h
 }
 
-func (h *LocalHandler) register(comp component.Component, opts []component.Option) error {
+func getTrees(engine nap.Engine) nap.HandlerTrees {
+	if engine == nil {
+		return nap.HandlerTrees{}
+	}
+	trees := engine.Trees()
+	if trees == nil {
+		return nap.HandlerTrees{}
+	}
+	return trees
+}
+
+func getAllNoRoutes(engine nap.Engine) *nap.HandlerNode {
+	if engine == nil {
+		return nap.NewHandlerNode()
+	}
+	return nap.NewHandlerNode(engine.AllNoRoutes()...)
+}
+
+func (h *LocalHandler) scan(comp component.Component, opts []component.Option) error {
 	s := component.NewService(comp, opts)
 
 	if _, ok := h.localServices[s.Name]; ok {
@@ -90,9 +109,9 @@ func (h *LocalHandler) register(comp component.Component, opts []component.Optio
 	// register all localHandlers
 	h.localServices[s.Name] = s
 	for name, handler := range s.Handlers {
-		n := fmt.Sprintf("%s.%s", s.Name, name)
-		log.Println("Register local handler", n)
-		h.localHandlers[n] = handler
+		route := fmt.Sprintf("%s.%s", s.Name, name)
+		log.Println("Register local handler", route)
+		h.localHandlers.Append(route, nap.NewHandlerNodeWithName(name, handler.Call))
 	}
 	return nil
 }
@@ -156,6 +175,17 @@ func (h *LocalHandler) RemoteService() []string {
 	return result
 }
 
+// handleWS 对于同一个连接(读是单独协程, 写是单独协程), 所有连接共用一个业务协程
+func (h *LocalHandler) handleWS(conn *websocket.Conn) {
+	c, err := newWSConn(conn)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	go h.handle(c)
+}
+
+// handle 循环读取数据包, 一个连接开启一个单独的写线程
 func (h *LocalHandler) handle(conn net.Conn) {
 	// create a client agent and startup write gorontine
 	agent := newAgent(conn, h.pipeline, h.remoteProcess)
@@ -193,7 +223,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			}
 		}
 
-		agent.Close()
+		_ = agent.Close()
 		if env.Debug {
 			log.Println(fmt.Sprintf("Session read goroutine exit, SessionID=%d, UID=%d", agent.session.ID(), agent.session.UID()))
 		}
@@ -213,7 +243,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 		if err != nil {
 			log.Println(err.Error())
 
-			// process packets decoded
+			// 处理已经解码的包并返回
 			for _, p := range packets {
 				if err := h.processPacket(agent, p); err != nil {
 					log.Println(err.Error())
@@ -223,7 +253,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			return
 		}
 
-		// process all packets
+		// 处理所有包
 		for _, p := range packets {
 			if err := h.processPacket(agent, p); err != nil {
 				log.Println(err.Error())
@@ -233,6 +263,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 	}
 }
 
+// processPacket 处理接收到的包, 转换成消息
 func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 	switch p.Type {
 	case packet.Handshake:
@@ -278,12 +309,27 @@ func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 	return nil
 }
 
-func (h *LocalHandler) findMembers(service string) []*clusterpb.MemberInfo {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.remoteServices[service]
+// processMessage 处理消息, 分发到本地或远程
+func (h *LocalHandler) processMessage(agent *agent, msg *message.Message) {
+	var lastMid uint64
+	switch msg.Type {
+	case message.Request:
+		lastMid = msg.ID
+	case message.Notify:
+		lastMid = 0
+	default:
+		log.Println("Invalid message type: " + msg.Type.String())
+		return
+	}
+	handlerNode, found := h.localHandlers[msg.Route]
+	if !found {
+		h.remoteProcess(agent.session, msg, false)
+	} else {
+		h.localProcess(handlerNode, lastMid, agent.session, msg)
+	}
 }
 
+// remoteProcess 处理远程消息
 func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Message, noCopy bool) {
 	index := strings.LastIndex(msg.Route, ".")
 	if index < 0 {
@@ -368,36 +414,8 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 	}
 }
 
-func (h *LocalHandler) processMessage(agent *agent, msg *message.Message) {
-	var lastMid uint64
-	switch msg.Type {
-	case message.Request:
-		lastMid = msg.ID
-	case message.Notify:
-		lastMid = 0
-	default:
-		log.Println("Invalid message type: " + msg.Type.String())
-		return
-	}
-
-	handler, found := h.localHandlers[msg.Route]
-	if !found {
-		h.remoteProcess(agent.session, msg, false)
-	} else {
-		h.localProcess(handler, lastMid, agent.session, msg)
-	}
-}
-
-func (h *LocalHandler) handleWS(conn *websocket.Conn) {
-	c, err := newWSConn(conn)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	go h.handle(c)
-}
-
-func (h *LocalHandler) localProcess(handler *component.Handler, lastMid uint64, session *session.Session, msg *message.Message) {
+// localProcess 本地处理
+func (h *LocalHandler) localProcess(handlerNode *nap.HandlerNode, lastMid uint64, session *session.Session, msg *message.Message) {
 	if pipe := h.pipeline; pipe != nil {
 		err := pipe.Inbound().Process(session, msg)
 		if err != nil {
@@ -405,64 +423,68 @@ func (h *LocalHandler) localProcess(handler *component.Handler, lastMid uint64, 
 			return
 		}
 	}
-
-	var payload = msg.Data
-	var data any
-	if handler.IsRawArg {
-		data = payload
-	} else {
-		data = reflect.New(handler.Type.Elem()).Interface()
-		err := env.Unmarshal(payload, data)
-		if err != nil {
-			log.Println(fmt.Sprintf("Deserialize to %T failed: %+v (%v)", data, err, payload))
-			return
-		}
+	index := strings.LastIndex(msg.Route, ".")
+	if index < 0 {
+		log.Println(fmt.Sprintf("nano/handler: invalid route %s", msg.Route))
+		return
 	}
+	service := msg.Route[:index]
 
 	if env.Debug {
-		log.Println(fmt.Sprintf("UID=%d, Message={%s}, Data=%+v", session.UID(), msg.String(), data))
+		log.Println(fmt.Sprintf("UID=%d, Message={%s}, Data=%+v", session.UID(), msg.String(), msg.Data))
 	}
 
-	args := []reflect.Value{handler.Receiver, reflect.ValueOf(session), reflect.ValueOf(data)}
 	task := func() {
+		//标记, 写响应的时候使用
 		switch v := session.NetworkEntity().(type) {
 		case *agent:
 			v.lastMid = lastMid
 		case *acceptor:
 			v.lastMid = lastMid
 		}
-
-		result := handler.Method.Func.Call(args)
-		if len(result) > 0 {
-			if err := result[0].Interface(); err != nil {
-				log.Println(fmt.Sprintf("Service %s error: %+v", msg.Route, err))
-			}
+		//获取 Context
+		pool := &h.opts.Pool
+		c := pool.Get().(*nap.Context)
+		defer pool.Put(c)
+		c.Reset()
+		//初始化
+		c.Mid = lastMid
+		c.Service = service
+		c.Msg = msg
+		c.Session = session
+		//有路由
+		if handlerNode.Len() > 0 {
+			c.HandlerNode = handlerNode
+			c.Next()
+			return
 		}
+		//无路由
+		c.HandlerNode = h.allNoRoutes
+		c.Next()
 	}
 
-	index := strings.LastIndex(msg.Route, ".")
-	if index < 0 {
-		log.Println(fmt.Sprintf("nano/handler: invalid route %s", msg.Route))
-		return
-	}
-
-	// A message can be dispatch to global thread or a user customized thread
-	service := msg.Route[:index]
+	// 消息可以分派到全局协程或用户自定义协程, 默认是全局协程
 	if s, found := h.localServices[service]; found && s.SchedName != "" {
 		sched := session.Value(s.SchedName)
 		if sched == nil {
 			log.Println(fmt.Sprintf("nanl/handler: cannot found `schedular.LocalScheduler` by %s", s.SchedName))
 			return
 		}
-
 		local, ok := sched.(scheduler.LocalScheduler)
 		if !ok {
-			log.Println(fmt.Sprintf("nanl/handler: Type %T does not implement the `schedular.LocalScheduler` interface",
-				sched))
+			log.Println(fmt.Sprintf("nanl/handler: Type %T does not implement the `schedular.LocalScheduler` interface", sched))
 			return
 		}
 		local.Schedule(task)
-	} else {
-		scheduler.PushTask(task)
+		return
 	}
+	//全局协程
+	scheduler.PushTask(task)
+}
+
+// findMembers 远程处理时, 查找服务对应的成员
+func (h *LocalHandler) findMembers(service string) []*clusterpb.MemberInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.remoteServices[service]
 }

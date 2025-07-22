@@ -34,6 +34,15 @@ func WithLogger(logger log.Logger) Option {
 	}
 }
 
+//==== 路由
+
+// WithDisableScan 禁止自动扫描路由
+func WithDisableScan() Option {
+	return func(opt *cluster.Options) {
+		opt.AutoScan = false
+	}
+}
+
 //==== 握手
 
 // WithCheckOrigin 设置跨域检查函数

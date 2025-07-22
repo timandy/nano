@@ -23,28 +23,22 @@ package component
 import (
 	"errors"
 	"reflect"
+
+	"github.com/lonng/nano/internal/log"
+	"github.com/lonng/nano/nap"
+	"github.com/lonng/nano/serialize/protobuf"
 )
 
-type (
-	//Handler represents a message.Message's handler's meta information.
-	Handler struct {
-		Receiver reflect.Value  // receiver of method
-		Method   reflect.Method // method stub
-		Type     reflect.Type   // arg type of method
-		IsRawArg bool           // whether the data need to unserialize
-	}
-
-	// Service implements a specific service, some of it's methods will be
-	// called when the correspond events is occurred.
-	Service struct {
-		Name      string              // name of service
-		Type      reflect.Type        // type of the receiver
-		Receiver  reflect.Value       // receiver of methods for the service
-		Handlers  map[string]*Handler // registered methods
-		SchedName string              // name of scheduler variable in session data
-		Options   options             // options
-	}
-)
+// Service implements a specific service, some of it's methods will be
+// called when the correspond events is occurred.
+type Service struct {
+	Name      string              // name of service
+	Type      reflect.Type        // type of the receiver
+	Receiver  reflect.Value       // receiver of methods for the service
+	Handlers  map[string]*Handler // registered methods
+	SchedName string              // name of scheduler variable in session data
+	Options   options             // options
+}
 
 func NewService(comp Component, opts []Option) *Service {
 	s := &Service{
@@ -67,28 +61,6 @@ func NewService(comp Component, opts []Option) *Service {
 	return s
 }
 
-// suitableMethods returns suitable methods of typ
-func (s *Service) suitableHandlerMethods(typ reflect.Type) map[string]*Handler {
-	methods := make(map[string]*Handler)
-	for m := 0; m < typ.NumMethod(); m++ {
-		method := typ.Method(m)
-		mt := method.Type
-		mn := method.Name
-		if isHandlerMethod(method) {
-			raw := false
-			if mt.In(2) == typeOfBytes {
-				raw = true
-			}
-			// rewrite handler name
-			if s.Options.nameFunc != nil {
-				mn = s.Options.nameFunc(mn)
-			}
-			methods[mn] = &Handler{Method: method, Type: mt.In(2), IsRawArg: raw}
-		}
-	}
-	return methods
-}
-
 // ExtractHandler extract the set of methods from the
 // receiver value which satisfy the following conditions:
 // - exported method of exported type
@@ -105,23 +77,174 @@ func (s *Service) ExtractHandler() error {
 	}
 
 	// Install the methods
-	s.Handlers = s.suitableHandlerMethods(s.Type)
+	s.Handlers = s.suitableHandlerMethods(s.Receiver, s.Type)
 
 	if len(s.Handlers) == 0 {
-		str := ""
 		// To help the user, see if a pointer receiver would work.
-		method := s.suitableHandlerMethods(reflect.PtrTo(s.Type))
-		if len(method) != 0 {
-			str = "type " + s.Name + " has no exported methods of suitable type (hint: pass a pointer to value of that type)"
-		} else {
-			str = "type " + s.Name + " has no exported methods of suitable type"
+		method := s.suitableHandlerMethods(s.Receiver, reflect.PtrTo(s.Type))
+		if len(method) == 0 {
+			return errors.New("type " + s.Name + " has no exported methods of suitable type")
 		}
-		return errors.New(str)
-	}
-
-	for i := range s.Handlers {
-		s.Handlers[i].Receiver = s.Receiver
+		return errors.New("type " + s.Name + " has no exported methods of suitable type (hint: pass a pointer to value of that type)")
 	}
 
 	return nil
+}
+
+// suitableMethods returns suitable methods of typ
+func (s *Service) suitableHandlerMethods(receiver reflect.Value, typ reflect.Type) map[string]*Handler {
+	methods := make(map[string]*Handler)
+	for m := 0; m < typ.NumMethod(); m++ {
+		method := typ.Method(m)
+		mn := method.Name
+		if isHandlerMethod(method) {
+			// rewrite handler name
+			if s.Options.nameFunc != nil {
+				mn = s.Options.nameFunc(mn)
+			}
+			methods[mn] = NewHandlerFromMethod(receiver, method)
+		}
+	}
+	return methods
+}
+
+// Handler 切点信息
+type Handler struct {
+	IsMethod bool
+	Receiver reflect.Value // receiver of method
+	//
+	handlerType   reflect.Type
+	handlerValue  reflect.Value
+	argTypes      []reflect.Type
+	responseType  reflect.Type
+	responseIndex int
+	errorIndex    int
+}
+
+// NewHandlerFromMethod 从方法创建
+func NewHandlerFromMethod(receiver reflect.Value, method reflect.Method) *Handler {
+	return newHandler(receiver, method.Func)
+}
+
+// NewHandlerFromFunc 从函数创建
+func NewHandlerFromFunc(handler any) *Handler {
+	return newHandler(reflect.Value{}, reflect.ValueOf(handler))
+}
+
+// newHandler 创建一个处理函数的切点
+func newHandler(receiver, handlerValue reflect.Value) *Handler {
+	//处理函数的反射类型
+	handlerType := handlerValue.Type()
+	if handlerType.Kind() != reflect.Func {
+		panic("handler [" + handlerType.String() + "] 必须是函数")
+	}
+	if handlerType.NumOut() > 2 {
+		panic("handler [" + handlerType.String() + "] 返回值不能超过 2 个")
+	}
+	//解析入参信息
+	argTypes := resolveArgTypes(handlerType)
+	//解析返回值信息
+	responseType, responseIndex, errorIndex := resolveReturnTypes(handlerType)
+	//定义切点, 织入处理函数, 后续可追加处理函数; 此处预先埋入系统级拦截器
+	return &Handler{
+		IsMethod: receiver.IsValid(),
+		Receiver: receiver,
+		//
+		handlerType:   handlerType,
+		handlerValue:  handlerValue,
+		argTypes:      argTypes,
+		responseType:  responseType,
+		responseIndex: responseIndex,
+		errorIndex:    errorIndex,
+	}
+}
+
+// Call 执行处理函数
+func (h *Handler) Call(c *nap.Context) {
+	args, err := h.ResolveArgs(c)
+	if err != nil {
+		c.Error(err)
+		log.Println("handler call resolve args error:", err)
+		return
+	}
+	retValues := h.handlerValue.Call(args)
+	response, err := h.ResolveReturnValues(retValues)
+	if err != nil {
+		c.Error(err)
+		log.Println("handler call resolve return values error:", err)
+		return
+	}
+	if response == nil {
+		return
+	}
+	err = c.Response(response)
+	if err != nil {
+		c.Error(err)
+		log.Println("handler call response error:", err)
+	}
+}
+
+// ResolveArgs 解析入参
+func (h *Handler) ResolveArgs(c *nap.Context) ([]reflect.Value, error) {
+	args := make([]reflect.Value, len(h.argTypes))
+	for i, argType := range h.argTypes {
+		arg, err := h.ResolveArg(c, i, argType)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = arg
+	}
+	return args, nil
+}
+
+// ResolveArg 解析单个入参
+func (h *Handler) ResolveArg(c *nap.Context, i int, argType reflect.Type) (reflect.Value, error) {
+	// 方法的接收者
+	if i == 0 && h.IsMethod {
+		return h.Receiver, nil
+	}
+	// Context 类型
+	if argType == nap.ContextType {
+		return reflect.ValueOf(c), nil
+	}
+	// *Session 类型
+	if argType == typeOfSession {
+		return reflect.ValueOf(c.Session), nil
+	}
+	// []byte 类型
+	if argType == typeOfBytes {
+		return reflect.ValueOf(c.Msg.Data), nil
+	}
+	// 其他类型 json: 结构体, 指针; protobuf: 结构体
+	ptrToArg := reflect.New(argType) //ptrToArg 即指向 arg 的指针, 不论 arg 为值类型还是指针类型
+	ptr := ptrToArg.Interface()
+	err := c.ShouldBind(ptr)
+	if err == nil {
+		return ptrToArg.Elem(), nil
+	}
+	// 其他类型 protobuf: 指针
+	if errors.Is(err, protobuf.ErrWrongValueType) && argType.Kind() == reflect.Ptr {
+		ptrOfArg := reflect.New(argType.Elem()) //ptrOfArg 即 arg 自身为指针
+		ptr = ptrOfArg.Interface()
+		err = c.ShouldBind(ptr)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		return ptrOfArg, nil
+	}
+	return reflect.Value{}, err
+}
+
+// ResolveReturnValues 解析返回值
+func (h *Handler) ResolveReturnValues(retValues []reflect.Value) (response any, err error) {
+	if h.responseIndex >= 0 {
+		response = retValues[h.responseIndex].Interface()
+	}
+	if h.errorIndex >= 0 {
+		errObj := retValues[h.errorIndex].Interface()
+		if errObj != nil {
+			err = errObj.(error)
+		}
+	}
+	return
 }

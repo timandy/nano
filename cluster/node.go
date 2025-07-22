@@ -34,6 +34,7 @@ import (
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
+	"github.com/lonng/nano/nap"
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
@@ -42,6 +43,9 @@ import (
 
 // Options 引擎选项
 type Options struct {
+	//注册路由
+	AutoScan bool //自动扫描
+
 	//握手
 	CheckOrigin        func(*http.Request) bool             //跨域检测, WebSocket 升级阶段
 	HandshakeValidator func(*session.Session, []byte) error //握手阶段回调
@@ -49,6 +53,7 @@ type Options struct {
 	//工作
 	Pipeline   pipeline.Pipeline     //所有输入前置函数和输出前置函数
 	Components *component.Components //业务组件, 类似 Controller
+	Pool       sync.Pool             //Context 池, 用于复用 Context 对象
 
 	//集群
 	IsMaster           bool                       //是否中心节点
@@ -62,7 +67,9 @@ type Options struct {
 
 // DefaultOptions 默认选项
 func DefaultOptions() *Options {
-	return &Options{
+	opts := Options{
+		//注册路由
+		AutoScan: true,
 		//握手
 		CheckOrigin:        func(_ *http.Request) bool { return true },
 		HandshakeValidator: nil,
@@ -71,6 +78,10 @@ func DefaultOptions() *Options {
 		//集群
 		IsMaster: false, //默认不是主节点
 	}
+	opts.Pool.New = func() any {
+		return &nap.Context{}
+	}
+	return &opts
 }
 
 // SingleMode 是否单节点模式
@@ -82,7 +93,8 @@ func (o *Options) SingleMode() bool {
 // Node 表示 nano 集群中的一个节点，该节点将包含一组服务。
 // 所有服务都将注册到集群，消息将通过 grpc 转发到节点提供相应的服务。
 type Node struct {
-	Options // current node options
+	engine   nap.Engine //引擎
+	*Options            //选项
 
 	cluster   *cluster
 	handler   *LocalHandler
@@ -97,9 +109,10 @@ type Node struct {
 }
 
 // NewNode 创建新的节点
-func NewNode(opts *Options) *Node {
+func NewNode(engine nap.Engine, opts *Options) *Node {
 	return &Node{
-		Options: *opts,
+		engine:  engine,
+		Options: opts,
 	}
 }
 
@@ -107,10 +120,17 @@ func NewNode(opts *Options) *Node {
 func (n *Node) Startup() error {
 	n.sessions = map[int64]*session.Session{}
 	n.cluster = newCluster(n)
-	n.handler = NewHandler(n, n.Pipeline, &n.Options)
+	n.handler = NewHandler(n)
 	components := n.Components.List()
+	autoScan := n.AutoScan
 	for _, c := range components {
-		err := n.handler.register(c.Comp, c.Opts)
+		c.Comp.Register(n.engine)
+		//禁用了扫描, 直接跳过
+		if !autoScan {
+			continue
+		}
+		//扫描
+		err := n.handler.scan(c.Comp, c.Opts)
 		if err != nil {
 			return err
 		}
@@ -255,7 +275,7 @@ EXIT:
 	}
 }
 
-// listenAndServe 启动 tcp/ip 监听
+// listenAndServe 启动 tcp/ip 监听; 对于同一个连接(读是单独协程, 写是单独协程), 所有连接共用一个业务协程
 func (n *Node) listenAndServe() {
 	listener, err := net.Listen("tcp", n.TcpAddr)
 	if err != nil {
@@ -274,7 +294,7 @@ func (n *Node) listenAndServe() {
 	}
 }
 
-// WsHandler 返回一个 http.Handler 用于处理 WebSocket 连接
+// WsHandler 返回一个 http.Handler 用于处理 WebSocket 连接; 对于同一个连接(读是单独协程, 写是单独协程), 所有连接共用一个业务协程
 func (n *Node) WsHandler() http.Handler {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -324,7 +344,7 @@ func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session
 }
 
 func (n *Node) HandleRequest(_ context.Context, req *clusterpb.RequestMessage) (*clusterpb.MemberHandleResponse, error) {
-	handler, found := n.handler.localHandlers[req.Route]
+	handlerNode, found := n.handler.localHandlers[req.Route]
 	if !found {
 		return nil, fmt.Errorf("service not found in current node: %v", req.Route)
 	}
@@ -338,7 +358,7 @@ func (n *Node) HandleRequest(_ context.Context, req *clusterpb.RequestMessage) (
 		Route: req.Route,
 		Data:  req.Data,
 	}
-	n.handler.localProcess(handler, req.Id, s, msg)
+	n.handler.localProcess(handlerNode, req.Id, s, msg)
 	return &clusterpb.MemberHandleResponse{}, nil
 }
 
