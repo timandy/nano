@@ -313,12 +313,7 @@ func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session
 		if err != nil {
 			return nil, err
 		}
-		ac := &acceptor{
-			sid:        sid,
-			gateClient: clusterpb.NewMemberClient(conns.Get()),
-			rpcHandler: n.handler.remoteProcess,
-			gateAddr:   gateAddr,
-		}
+		ac := newAcceptor(sid, clusterpb.NewMemberClient(conns.Get()), n.handler.remoteProcess, gateAddr)
 		s = session.New(ac)
 		ac.session = s
 		n.mu.Lock()

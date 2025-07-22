@@ -50,33 +50,32 @@ var (
 	ErrBufferExceed = errors.New("session send buffer exceed")
 )
 
-type (
-	// Agent corresponding a user, used for store raw conn information
-	agent struct {
-		// regular agent member
-		session  *session.Session    // session
-		conn     net.Conn            // low-level conn fd
-		lastMid  uint64              // last message id
-		state    int32               // current agent state
-		chDie    chan struct{}       // wait for close
-		chSend   chan pendingMessage // push message queue
-		lastAt   int64               // last heartbeat unix time stamp
-		decoder  *codec.Decoder      // binary decoder
-		pipeline pipeline.Pipeline
+var _ session.NetworkEntity = (*agent)(nil)
 
-		rpcHandler rpcHandler
-		srv        reflect.Value // cached session reflect.Value
-	}
+// Agent corresponding a user, used for store raw conn information
+type agent struct {
+	// regular agent member
+	session    *session.Session    // session
+	conn       net.Conn            // low-level conn fd
+	lastMid    uint64              // last message id
+	state      int32               // current agent state
+	chDie      chan struct{}       // wait for close
+	chSend     chan pendingMessage // push message queue
+	lastAt     int64               // last heartbeat unix time stamp
+	decoder    *codec.Decoder      // binary decoder
+	pipeline   pipeline.Pipeline   //
+	rpcHandler rpcHandler          //
+	srv        reflect.Value       // cached session reflect.Value
+}
 
-	pendingMessage struct {
-		typ     message.Type // message type
-		route   string       // message route(push)
-		mid     uint64       // response message id(response)
-		payload any          // payload
-	}
-)
+type pendingMessage struct {
+	typ     message.Type // message type
+	route   string       // message route(push)
+	mid     uint64       // response message id(response)
+	payload any          // payload
+}
 
-// Create new agent instance
+// 与客户端直接通信的网络对象(单点模式中的节点, 或集群模式的网关)
 func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) *agent {
 	a := &agent{
 		conn:       conn,
@@ -93,7 +92,6 @@ func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) 
 	s := session.New(a)
 	a.session = s
 	a.srv = reflect.ValueOf(s)
-
 	return a
 }
 

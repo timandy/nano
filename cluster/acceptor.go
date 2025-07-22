@@ -11,6 +11,8 @@ import (
 	"github.com/lonng/nano/session"
 )
 
+var _ session.NetworkEntity = (*acceptor)(nil)
+
 type acceptor struct {
 	sid        int64
 	gateClient clusterpb.MemberClient
@@ -18,6 +20,16 @@ type acceptor struct {
 	lastMid    uint64
 	rpcHandler rpcHandler
 	gateAddr   string
+}
+
+// 集群模式中, 工作节点的网络对象
+func newAcceptor(sid int64, gateClient clusterpb.MemberClient, rpcHandler rpcHandler, gateAddr string) *acceptor {
+	return &acceptor{
+		sid:        sid,
+		gateClient: gateClient,
+		rpcHandler: rpcHandler,
+		gateAddr:   gateAddr,
+	}
 }
 
 // Push implements the session.NetworkEntity interface
