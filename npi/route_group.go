@@ -5,7 +5,7 @@ import (
 )
 
 type IRoutes interface {
-	Group(handlers ...HandlerFunc) IRoutes
+	Group(handlers ...HandlerFunc) *RouterGroup
 
 	Use(middleware ...HandlerFunc) IRoutes
 
@@ -32,7 +32,7 @@ func NewRouterGroup(engine Engine, handlers ...HandlerFunc) *RouterGroup {
 	}
 }
 
-func (group *RouterGroup) Group(handlers ...HandlerFunc) IRoutes {
+func (group *RouterGroup) Group(handlers ...HandlerFunc) *RouterGroup {
 	return &RouterGroup{
 		Handlers: group.CombineHandlers(handlers),
 		engine:   group.engine,
