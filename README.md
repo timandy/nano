@@ -1,16 +1,16 @@
 # Nano [![Build Status][1]][2] [![GoDoc][3]][4] [![Go Report Card][5]][6] [![MIT licensed][7]][8]
 
-[1]: https://github.com/lonng/nano/actions/workflows/go.yml/badge.svg?branch=master
+[1]: https://github.com/timandy/nano/actions/workflows/go.yml/badge.svg?branch=master
 
-[2]: https://github.com/lonng/nano/actions/workflows/go.yml
+[2]: https://github.com/timandy/nano/actions/workflows/go.yml
 
-[3]: https://godoc.org/github.com/lonng/nano?status.svg
+[3]: https://godoc.org/github.com/timandy/nano?status.svg
 
-[4]: https://godoc.org/github.com/lonng/nano
+[4]: https://godoc.org/github.com/timandy/nano
 
-[5]: https://goreportcard.com/badge/github.com/lonng/nano
+[5]: https://goreportcard.com/badge/github.com/timandy/nano
 
-[6]: https://goreportcard.com/report/github.com/lonng/nano
+[6]: https://goreportcard.com/report/github.com/timandy/nano
 
 [7]: https://img.shields.io/badge/license-MIT-blue.svg
 
@@ -33,9 +33,9 @@ Join to Discord: [Nano Community](https://discord.gg/eHEDrBH5PV)
 
 The simplest "nano" application as shown in the following figure, you can make powerful applications by combining different components.
 
-![Application](media/application.png)
+![Application](.docs/media/application.png)
 
-In fact, the `nano` application is a collection of[Component ](./docs/get_started.md#component) , and a component is a bundle of[Handler](./docs/get_started.md#handler), once you register a component to nano, nano will register all methods that can be converted to `Handler` to nano service container. Service was accessed by `Component.Handler`, and the handler will be called while client request. The handler will receive two parameters while handling a message:
+In fact, the `nano` application is a collection of[Component ](./.docs/get_started.md#component) , and a component is a bundle of[Handler](./.docs/get_started.md#handler), once you register a component to nano, nano will register all methods that can be converted to `Handler` to nano service container. Service was accessed by `Component.Handler`, and the handler will be called while client request. The handler will receive two parameters while handling a message:
 
 - `*session.Session`: corresponding a client that apply this request or notify.
 - `*protocol.FooBar`: the payload of the request.
@@ -46,7 +46,7 @@ While you had processed your logic, you can response or push message to the clie
 
 Nano contains built-in distributed system solution, and make you creating a distributed game server easily.
 
-See: [The distributed chat demo](https://github.com/lonng/nano/tree/master/examples/cluster)
+See: [The distributed chat demo](https://github.com/timandy/nano/tree/master/test/examples/cluster)
 
 The Nano will remain simple, but you can perform any operations in the component and get the desired goals. You can startup a group of `Nano` application as agent to dispatch message to backend servers.
 
@@ -72,17 +72,17 @@ func (manager *PlayerManager) Login(s *session.Session, msg *ReqPlayerLogin) err
 ## Documents
 
 - English
-    + [How to build your first nano application](./docs/get_started.md)
-    + [Route compression](./docs/route_compression.md)
-    + [Communication protocol](./docs/communication_protocol.md)
-    + [Design patterns](./docs/design_patterns.md)
+    + [How to build your first nano application](./.docs/get_started.md)
+    + [Route compression](./.docs/route_compression.md)
+    + [Communication protocol](./.docs/communication_protocol.md)
+    + [Design patterns](./.docs/design_patterns.md)
     + [API Reference(Server)](https://godoc.org/github.com/lonnng/nano)
     + [How to integrate `Lua` into `Nano` component(incomplete)](.)
 
 - 简体中文
-    + [如何构建你的第一个nano应用](./docs/get_started_zh_CN.md)
-    + [路由压缩](./docs/route_compression_zh_CN.md)
-    + [通信协议](./docs/communication_protocol_zh_CN.md)
+    + [如何构建你的第一个nano应用](./.docs/get_started_zh_CN.md)
+    + [路由压缩](./.docs/route_compression_zh_CN.md)
+    + [通信协议](./.docs/communication_protocol_zh_CN.md)
     + [API参考(服务器)](https://godoc.org/github.com/lonnng/nano)
     + [如何将`lua`脚本集成到`nano`组件中(未完成)](.)
 
