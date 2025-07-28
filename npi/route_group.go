@@ -5,7 +5,9 @@ import (
 )
 
 type IRoutes interface {
-	Group(handlers ...HandlerFunc) *RouterGroup
+	BasePath() string
+
+	Group(relativePath string, handlers ...HandlerFunc) *RouterGroup
 
 	Use(middleware ...HandlerFunc) IRoutes
 
@@ -16,6 +18,7 @@ var _ IRoutes = (*RouterGroup)(nil)
 
 type RouterGroup struct {
 	Handlers HandlersChain
+	basePath string
 	engine   Engine
 	root     bool
 }
@@ -32,9 +35,14 @@ func NewRouterGroup(engine Engine, handlers ...HandlerFunc) *RouterGroup {
 	}
 }
 
-func (group *RouterGroup) Group(handlers ...HandlerFunc) *RouterGroup {
+func (group *RouterGroup) BasePath() string {
+	return group.basePath
+}
+
+func (group *RouterGroup) Group(relativePath string, handlers ...HandlerFunc) *RouterGroup {
 	return &RouterGroup{
 		Handlers: group.CombineHandlers(handlers),
+		basePath: group.calculateAbsolutePath(relativePath),
 		engine:   group.engine,
 		root:     false,
 	}
@@ -45,9 +53,10 @@ func (group *RouterGroup) Use(handler ...HandlerFunc) IRoutes {
 	return group.returnObj()
 }
 
-func (group *RouterGroup) Handle(route string, handler ...HandlerFunc) IRoutes {
+func (group *RouterGroup) Handle(routePath string, handler ...HandlerFunc) IRoutes {
+	absolutePath := group.calculateAbsolutePath(routePath)
 	handlers := group.CombineHandlers(handler)
-	group.engine.AddRoute(route, handlers...)
+	group.engine.AddRoute(absolutePath, handlers...)
 	return group.returnObj()
 }
 
@@ -58,6 +67,10 @@ func (group *RouterGroup) CombineHandlers(handlers HandlersChain) HandlersChain 
 	copy(mergedHandlers, group.Handlers)
 	copy(mergedHandlers[len(group.Handlers):], handlers)
 	return mergedHandlers
+}
+
+func (group *RouterGroup) calculateAbsolutePath(relativePath string) string {
+	return JoinPaths(group.basePath, relativePath)
 }
 
 func (group *RouterGroup) returnObj() IRoutes {

@@ -2,10 +2,10 @@ package npi
 
 type HandlerTrees map[string]*HandlerNode
 
-func (t HandlerTrees) Append(route string, handlerNode *HandlerNode) {
-	if node, found := t[route]; found {
+func (t HandlerTrees) Append(path string, handlerNode *HandlerNode) {
+	if node, found := t[path]; found {
 		node.Combine(handlerNode)
 		return
 	}
-	t[route] = handlerNode
+	t[path] = handlerNode
 }

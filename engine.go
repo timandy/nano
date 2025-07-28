@@ -90,19 +90,19 @@ func (engine *Engine) rebuild404Handlers() {
 }
 
 // AddRoute 添加路由
-func (engine *Engine) AddRoute(route string, handlers ...npi.HandlerFunc) {
-	assert.Assert(strings.Contains(route, "."), "route should contains '.'")
+func (engine *Engine) AddRoute(path string, handlers ...npi.HandlerFunc) {
+	assert.Assert(strings.Contains(path, "."), "path should contains '.'")
 	assert.Assert(len(handlers) > 0, "there must be at least one handler")
 
-	engine.trees.Append(route, npi.NewHandlerNode(handlers...))
+	engine.trees.Append(path, npi.NewHandlerNode(handlers...))
 }
 
 // Routes 获取注册的路由信息
 func (engine *Engine) Routes() npi.RoutesInfo {
 	var routes npi.RoutesInfo
-	for route, node := range engine.trees {
+	for path, node := range engine.trees {
 		routes = append(routes, npi.RouteInfo{
-			Route:       route,
+			Path:        path,
 			Handler:     node.Name(),
 			HandlerFunc: node.Handlers().Last(),
 		})
