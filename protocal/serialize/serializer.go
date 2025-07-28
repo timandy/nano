@@ -21,7 +21,6 @@
 package serialize
 
 type (
-
 	// Marshaler represents a marshal interface
 	Marshaler interface {
 		Marshal(any) ([]byte, error)

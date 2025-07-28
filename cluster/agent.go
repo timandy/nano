@@ -31,7 +31,6 @@ import (
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/pipeline"
-	"github.com/lonng/nano/protocal/codec"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
 	"github.com/lonng/nano/scheduler"
@@ -62,7 +61,7 @@ type agent struct {
 	chDie      chan struct{}       // wait for close
 	chSend     chan pendingMessage // push message queue
 	lastAt     int64               // last heartbeat unix time stamp
-	decoder    *codec.Decoder      // binary decoder
+	decoder    *packet.Decoder     // binary decoder
 	pipeline   pipeline.Pipeline   //
 	rpcHandler rpcHandler          //
 	srv        reflect.Value       // cached session reflect.Value
@@ -83,7 +82,7 @@ func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) 
 		chDie:      make(chan struct{}),
 		lastAt:     time.Now().Unix(),
 		chSend:     make(chan pendingMessage, agentWriteBacklog),
-		decoder:    codec.NewDecoder(),
+		decoder:    packet.NewDecoder(),
 		pipeline:   pipeline,
 		rpcHandler: rpcHandler,
 	}
@@ -297,7 +296,7 @@ func (a *agent) write() {
 			}
 
 			// packet encode
-			p, err := codec.Encode(packet.Data, em)
+			p, err := packet.Encode(packet.Data, em)
 			if err != nil {
 				log.Info("Encode packet error.", err)
 				break

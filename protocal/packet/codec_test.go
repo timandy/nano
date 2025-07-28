@@ -1,10 +1,8 @@
-package codec
+package packet
 
 import (
 	"reflect"
 	"testing"
-
-	. "github.com/lonng/nano/protocal/packet"
 )
 
 func TestPack(t *testing.T) {

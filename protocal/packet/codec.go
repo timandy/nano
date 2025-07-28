@@ -18,13 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package codec
+package packet
 
 import (
 	"bytes"
 	"errors"
-
-	"github.com/lonng/nano/protocal/packet"
 )
 
 // Codec constants.
@@ -33,8 +31,12 @@ const (
 	MaxPacketSize = 64 * 1024
 )
 
-// ErrPacketSizeExcced is the error used for encode/decode.
-var ErrPacketSizeExcced = errors.New("codec: packet size exceed")
+var (
+	// ErrWrongPacketType represents a wrong packet type.
+	ErrWrongPacketType = errors.New("wrong packet type")
+	// ErrPacketSizeExcced is the error used for encode/decode.
+	ErrPacketSizeExcced = errors.New("codec: packet size exceed")
+)
 
 // A Decoder reads and decodes network data slice
 type Decoder struct {
@@ -53,8 +55,8 @@ func NewDecoder() *Decoder {
 func (c *Decoder) forward() error {
 	header := c.buf.Next(HeadLength)
 	c.typ = header[0]
-	if c.typ < packet.Handshake || c.typ > packet.Kick {
-		return packet.ErrWrongPacketType
+	if c.typ < Handshake || c.typ > Kick {
+		return ErrWrongPacketType
 	}
 	c.size = bytesToInt(header[1:])
 
@@ -67,11 +69,11 @@ func (c *Decoder) forward() error {
 
 // Decode decode the network bytes slice to packet.Packet(s)
 // TODO(Warning): shared slice
-func (c *Decoder) Decode(data []byte) ([]*packet.Packet, error) {
+func (c *Decoder) Decode(data []byte) ([]*Packet, error) {
 	c.buf.Write(data)
 
 	var (
-		packets []*packet.Packet
+		packets []*Packet
 		err     error
 	)
 	// check length
@@ -87,7 +89,7 @@ func (c *Decoder) Decode(data []byte) ([]*packet.Packet, error) {
 	}
 
 	for c.size <= c.buf.Len() {
-		p := &packet.Packet{Type: packet.Type(c.typ), Length: c.size, Data: c.buf.Next(c.size)}
+		p := &Packet{Type: Type(c.typ), Length: c.size, Data: c.buf.Next(c.size)}
 		packets = append(packets, p)
 
 		// more packet
@@ -110,12 +112,12 @@ func (c *Decoder) Decode(data []byte) ([]*packet.Packet, error) {
 // -<type>-|--------<length>--------|-<data>-
 // --------|------------------------|--------
 // 1 byte packet type, 3 bytes packet data length(big end), and data segment
-func Encode(typ packet.Type, data []byte) ([]byte, error) {
-	if typ < packet.Handshake || typ > packet.Kick {
-		return nil, packet.ErrWrongPacketType
+func Encode(typ Type, data []byte) ([]byte, error) {
+	if typ < Handshake || typ > Kick {
+		return nil, ErrWrongPacketType
 	}
 
-	p := &packet.Packet{Type: typ, Length: len(data)}
+	p := &Packet{Type: typ, Length: len(data)}
 	buf := make([]byte, p.Length+HeadLength)
 	buf[0] = byte(p.Type)
 

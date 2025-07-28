@@ -26,7 +26,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/protocal/codec"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
 	"google.golang.org/protobuf/proto"
@@ -39,12 +38,12 @@ var (
 
 func init() {
 	var err error
-	hsd, err = codec.Encode(packet.Handshake, nil)
+	hsd, err = packet.Encode(packet.Handshake, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	had, err = codec.Encode(packet.HandshakeAck, nil)
+	had, err = packet.Encode(packet.HandshakeAck, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +58,7 @@ type (
 	// Connector is a tiny Nano client
 	Connector struct {
 		conn   *websocket.Conn // low-level connection
-		codec  *codec.Decoder  // decoder
+		codec  *packet.Decoder // decoder
 		die    chan struct{}   // connector close channel
 		chSend chan []byte     // send queue
 		mid    uint64          // message id
@@ -80,7 +79,7 @@ type (
 func NewConnector() *Connector {
 	return &Connector{
 		die:       make(chan struct{}),
-		codec:     codec.NewDecoder(),
+		codec:     packet.NewDecoder(),
 		chSend:    make(chan []byte, 64),
 		mid:       1,
 		events:    map[string]Callback{},
@@ -200,7 +199,7 @@ func (c *Connector) sendMessage(msg *message.Message) error {
 
 	//log.Printf("%v",msg)
 
-	payload, err := codec.Encode(packet.Data, data)
+	payload, err := packet.Encode(packet.Data, data)
 	if err != nil {
 		return err
 	}

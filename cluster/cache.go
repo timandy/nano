@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/lonng/nano/internal/env"
-	"github.com/lonng/nano/protocal/codec"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
 )
@@ -49,12 +48,12 @@ func cache() {
 		panic(err)
 	}
 
-	hsd, err = codec.Encode(packet.Handshake, data)
+	hsd, err = packet.Encode(packet.Handshake, data)
 	if err != nil {
 		panic(err)
 	}
 
-	hbd, err = codec.Encode(packet.Heartbeat, nil)
+	hbd, err = packet.Encode(packet.Heartbeat, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +62,7 @@ func cache() {
 // 获取握手响应, 缓存的
 func getHsd() []byte {
 	servertime := []byte(strconv.FormatInt(time.Now().Unix(), 10))
-	return codec.Replace(hsd, hsdPlaceholder, servertime)
+	return packet.Replace(hsd, hsdPlaceholder, servertime)
 }
 
 // 获取心跳请求, 缓存的
