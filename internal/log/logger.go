@@ -20,26 +20,18 @@
 
 package log
 
-import (
-	"log"
-	"os"
-)
-
-// Logger represents  the log interface
 type Logger interface {
-	Println(v ...any)
-	Fatal(v ...any)
-	Fatalf(format string, v ...any)
+	Info(args ...any)
+	Fatal(args ...any)
 }
 
 func init() {
-	SetLogger(log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile))
+	SetLogger(NewConsoleLogger())
 }
 
 var (
-	Println func(v ...any)
-	Fatal   func(v ...any)
-	Fatalf  func(format string, v ...any)
+	Info  func(args ...any)
+	Fatal func(args ...any)
 )
 
 // SetLogger rewrites the default logger
@@ -47,7 +39,6 @@ func SetLogger(logger Logger) {
 	if logger == nil {
 		return
 	}
-	Println = logger.Println
+	Info = logger.Info
 	Fatal = logger.Fatal
-	Fatalf = logger.Fatalf
 }
