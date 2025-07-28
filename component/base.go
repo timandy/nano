@@ -20,15 +20,11 @@
 
 package component
 
-import "github.com/lonng/nano/npi"
-
 var _ Component = (*Base)(nil)
 
 // Base implements a default component for Component.
 type Base struct {
 }
-
-func (c *Base) Register(npi.IRoutes) {}
 
 // Init was called to initialize the component.
 func (c *Base) Init() {}

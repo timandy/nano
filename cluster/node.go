@@ -33,9 +33,9 @@ import (
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/pipeline"
+	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 	"google.golang.org/grpc"
@@ -53,7 +53,6 @@ type Options struct {
 	//工作
 	Pipeline   pipeline.Pipeline     //所有输入前置函数和输出前置函数
 	Components *component.Components //业务组件, 类似 Controller
-	Pool       sync.Pool             //Context 池, 用于复用 Context 对象
 
 	//集群
 	IsMaster           bool                       //是否中心节点
@@ -67,7 +66,7 @@ type Options struct {
 
 // DefaultOptions 默认选项
 func DefaultOptions() *Options {
-	opts := Options{
+	return &Options{
 		//注册路由
 		AutoScan: true,
 		//握手
@@ -78,10 +77,6 @@ func DefaultOptions() *Options {
 		//集群
 		IsMaster: false, //默认不是主节点
 	}
-	opts.Pool.New = func() any {
-		return &npi.Context{}
-	}
-	return &opts
 }
 
 // SingleMode 是否单节点模式
@@ -93,8 +88,10 @@ func (o *Options) SingleMode() bool {
 // Node 表示 nano 集群中的一个节点，该节点将包含一组服务。
 // 所有服务都将注册到集群，消息将通过 grpc 转发到节点提供相应的服务。
 type Node struct {
-	engine   npi.Engine //引擎
-	*Options            //选项
+	engine   npi.Engine          //引擎
+	pool     sync.Pool           //Context 池, 用于复用 Context 对象
+	upgrader *websocket.Upgrader //升级器
+	*Options                     //选项
 
 	cluster   *cluster
 	handler   *LocalHandler
@@ -111,7 +108,15 @@ type Node struct {
 // NewNode 创建新的节点
 func NewNode(engine npi.Engine, opts *Options) *Node {
 	return &Node{
-		engine:  engine,
+		engine: engine,
+		pool: sync.Pool{New: func() any {
+			return &npi.Context{}
+		}},
+		upgrader: &websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin:     opts.CheckOrigin,
+		},
 		Options: opts,
 	}
 }
@@ -120,28 +125,27 @@ func NewNode(engine npi.Engine, opts *Options) *Node {
 func (n *Node) Startup() error {
 	n.sessions = map[int64]*session.Session{}
 	n.cluster = newCluster(n)
-	n.handler = NewHandler(n)
+	n.handler = newHandler(n)
 	components := n.Components.List()
 	autoScan := n.AutoScan
-	for _, c := range components {
-		c.Comp.Register(n.engine)
-		//禁用了扫描, 直接跳过
-		if !autoScan {
-			continue
-		}
-		//扫描
-		err := n.handler.scan(c.Comp, c.Opts)
-		if err != nil {
-			return err
+	if autoScan {
+		for _, c := range components {
+			//扫描
+			err := n.handler.scan(c.Comp, c.Opts)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
+	//创建缓存数据
 	cache()
+
+	//初始化节点
 	if err := n.initNode(); err != nil {
 		return err
 	}
 
-	// Initialize all components
+	//初始化组件列表
 	for _, c := range components {
 		c.Comp.Init()
 	}
@@ -176,11 +180,12 @@ func (n *Node) initNode() error {
 		return err
 	}
 
-	// Initialize the gRPC server and register service
+	//初始化 gRPC 服务器并注册服务
 	n.server = grpc.NewServer()
 	n.rpcClient = newRPCClient()
-	n.registerServices()
+	n.registerServices() //注册服务
 
+	//开始 gRPC 监听
 	go func() {
 		err := n.server.Serve(listener)
 		if err != nil {
@@ -188,42 +193,59 @@ func (n *Node) initNode() error {
 		}
 	}()
 
+	//初始化主节点
 	if n.IsMaster {
-		member := &Member{
-			isMaster: true,
-			memberInfo: &clusterpb.MemberInfo{
-				Label:       n.Label,
-				ServiceAddr: n.ServiceAddr,
-				Services:    n.handler.LocalService(),
-			},
-		}
-		n.cluster.members = append(n.cluster.members, member)
-		n.cluster.setRpcClient(n.rpcClient)
-	} else {
-		pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
-		if err != nil {
-			return err
-		}
-		client := clusterpb.NewMasterClient(pool.Get())
-		request := &clusterpb.RegisterRequest{
-			MemberInfo: &clusterpb.MemberInfo{
-				Label:       n.Label,
-				ServiceAddr: n.ServiceAddr,
-				Services:    n.handler.LocalService(),
-			},
-		}
-		for {
-			resp, err := client.Register(context.Background(), request)
-			if err == nil {
-				n.handler.initRemoteService(resp.Members)
-				n.cluster.initMembers(resp.Members)
-				break
-			}
-			log.Info("Register current node to cluster failed, and will retry in %v.", env.RetryInterval.String(), err)
-			time.Sleep(env.RetryInterval)
-		}
-		n.once.Do(n.keepalive)
+		return n.initMaster()
 	}
+
+	//初始化成员节点
+	return n.initMember()
+}
+
+// initMaster 初始化主节点
+func (n *Node) initMaster() error {
+	member := &Member{
+		isMaster: true,
+		memberInfo: &clusterpb.MemberInfo{
+			Label:       n.Label,
+			ServiceAddr: n.ServiceAddr,
+			Services:    n.handler.LocalService(),
+		},
+	}
+	n.cluster.members = append(n.cluster.members, member)
+	n.cluster.setRpcClient(n.rpcClient)
+	return nil
+}
+
+// initMember 初始化成员节点
+func (n *Node) initMember() error {
+	pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
+	if err != nil {
+		return err
+	}
+	client := clusterpb.NewMasterClient(pool.Get())
+	request := &clusterpb.RegisterRequest{
+		MemberInfo: &clusterpb.MemberInfo{
+			Label:       n.Label,
+			ServiceAddr: n.ServiceAddr,
+			Services:    n.handler.LocalService(),
+		},
+	}
+
+	//将成员地址和成员服务注册到主节点, 主节点返回其他成员的服务, 同时主节点也会将当前节点的服务通知其他成员节点
+	for {
+		resp, err := client.Register(context.Background(), request)
+		if err == nil {
+			n.handler.initRemoteService(resp.Members)
+			n.cluster.initMembers(resp.Members)
+			break
+		}
+		log.Info("Register current node to cluster failed, and will retry in %v.", env.RetryInterval.String(), err)
+		time.Sleep(env.RetryInterval)
+	}
+
+	//成员节点, 异步心跳
+	n.once.Do(n.keepalive)
 	return nil
 }
 
@@ -275,6 +297,16 @@ EXIT:
 	}
 }
 
+// ServeHttp 处理 HTTP 请求, 主要用于 WebSocket 升级
+func (n *Node) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	conn, err := n.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Info("Upgrade failure, URI=%s", r.RequestURI, err)
+		return
+	}
+	n.handler.handleWS(conn)
+}
+
 // listenAndServe 启动 tcp/ip 监听; 对于同一个连接(读是单独协程, 写是单独协程), 所有连接共用一个业务协程
 func (n *Node) listenAndServe() {
 	listener, err := net.Listen("tcp", n.TcpAddr)
@@ -292,23 +324,6 @@ func (n *Node) listenAndServe() {
 
 		go n.handler.handle(conn)
 	}
-}
-
-// WsHandler 返回一个 http.Handler 用于处理 WebSocket 连接; 对于同一个连接(读是单独协程, 写是单独协程), 所有连接共用一个业务协程
-func (n *Node) WsHandler() http.Handler {
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     n.CheckOrigin,
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Info("Upgrade failure, URI=%s", r.RequestURI, err)
-			return
-		}
-		n.handler.handleWS(conn)
-	})
 }
 
 func (n *Node) storeSession(s *session.Session) {

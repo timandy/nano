@@ -26,7 +26,7 @@ import (
 
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/npi"
-	"github.com/lonng/nano/serialize/protobuf"
+	"github.com/lonng/nano/protocal/serialize/protobuf"
 )
 
 // Service implements a specific service, some of it's methods will be

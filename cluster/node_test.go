@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lonng/nano/benchmark/testdata"
-	"github.com/lonng/nano/benchmark/ws"
 	"github.com/lonng/nano/cluster"
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/test/benchmark/testdata"
+	"github.com/lonng/nano/test/benchmark/ws"
 	. "github.com/pingcap/check"
 )
 
@@ -59,9 +59,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	masterOpts.IsMaster = true
 	masterOpts.Components = masterComps
 	masterOpts.ServiceAddr = "127.0.0.1:4450"
-	masterNode := &cluster.Node{
-		Options: masterOpts,
-	}
+	masterNode := cluster.NewNode(nil, masterOpts)
 	err := masterNode.Startup()
 	c.Assert(err, IsNil)
 	masterHandler := masterNode.Handler()
@@ -73,9 +71,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	member1Opts.AdvertiseAddr = "127.0.0.1:4450"
 	member1Opts.ServiceAddr = "127.0.0.1:14451"
 	member1Opts.Components = member1Comps
-	memberNode1 := &cluster.Node{
-		Options: member1Opts,
-	}
+	memberNode1 := cluster.NewNode(nil, member1Opts)
 	err = memberNode1.Startup()
 	c.Assert(err, IsNil)
 	member1Handler := memberNode1.Handler()
@@ -85,7 +81,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	c.Assert(member1Handler.RemoteService(), DeepEquals, []string{"MasterComponent"})
 	//网关监听
 	mux1 := http.NewServeMux()
-	mux1.Handle("/ws", memberNode1.WsHandler())
+	mux1.Handle("/ws", memberNode1)
 	go http.ListenAndServe(":14452", mux1)
 	//游戏
 	member2Comps := &component.Components{}
@@ -94,9 +90,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	member2Opts.AdvertiseAddr = "127.0.0.1:4450"
 	member2Opts.ServiceAddr = "127.0.0.1:24451"
 	member2Opts.Components = member2Comps
-	memberNode2 := &cluster.Node{
-		Options: member2Opts,
-	}
+	memberNode2 := cluster.NewNode(nil, member2Opts)
 	err = memberNode2.Startup()
 	c.Assert(err, IsNil)
 	member2Handler := memberNode2.Handler()

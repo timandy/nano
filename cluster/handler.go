@@ -35,10 +35,10 @@ import (
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/message"
-	"github.com/lonng/nano/internal/packet"
 	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/pipeline"
+	"github.com/lonng/nano/protocal/message"
+	"github.com/lonng/nano/protocal/packet"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 )
@@ -64,7 +64,7 @@ type LocalHandler struct {
 	opts        *Options
 }
 
-func NewHandler(currentNode *Node) *LocalHandler {
+func newHandler(currentNode *Node) *LocalHandler {
 	engine := currentNode.engine
 	return &LocalHandler{
 		localServices:  make(map[string]*component.Service),
@@ -442,7 +442,7 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 			v.lastMid = lastMid
 		}
 		//获取 Context
-		pool := &h.opts.Pool
+		pool := &h.currentNode.pool
 		c := pool.Get().(*npi.Context)
 		defer pool.Put(c)
 		c.Reset()

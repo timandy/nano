@@ -4,9 +4,9 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/lonng/nano/binding"
-	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/utils/reflection"
+	"github.com/lonng/nano/protocal/binding"
+	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/session"
 )
 

@@ -62,19 +62,20 @@ func New(opts ...Option) *Engine {
 	for _, opt := range opts {
 		opt(options)
 	}
-	return &Engine{
-		RouterGroup: npi.NewRootGroup(),
-		trees:       npi.HandlerTrees{},
-		allNoRoute:  nil,
-		noRoute:     nil,
-		running:     0,
-		opts:        options,
+	engine := &Engine{
+		trees:      npi.HandlerTrees{},
+		allNoRoute: nil,
+		noRoute:    nil,
+		running:    0,
+		opts:       options,
 	}
+	engine.RouterGroup = npi.NewRootGroup(engine)
+	return engine
 }
 
-// Options 获取选项
-func (engine *Engine) Options() *cluster.Options {
-	return engine.opts
+// ServeHTTP conforms to the http.Handler interface.
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	engine.node.ServeHTTP(w, r)
 }
 
 // NoRoute 为 NoRoute 添加处理程序。默认情况下，它返回一个 404 代码。
@@ -153,16 +154,6 @@ func (engine *Engine) Shutdown() {
 	atomic.StoreInt32(&engine.running, 0)
 }
 
-// Node 获取引擎的节点, 启动后才有只
-func (engine *Engine) Node() *cluster.Node {
-	return engine.node
-}
-
-// WsHandler 返回处理 WebSocket 连接的函数, 只有启动后才能获取
-func (engine *Engine) WsHandler() http.Handler {
-	return engine.node.WsHandler()
-}
-
 // Listen 启动 WebSocket 服务
 func (engine *Engine) Listen(addr string, path string) error {
 	err := engine.Startup()
@@ -170,7 +161,7 @@ func (engine *Engine) Listen(addr string, path string) error {
 		return err
 	}
 	mux := http.NewServeMux()
-	mux.Handle(path, engine.WsHandler())
+	mux.Handle(path, engine)
 	return http.ListenAndServe(addr, mux)
 }
 

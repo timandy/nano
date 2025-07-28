@@ -6,9 +6,9 @@ import (
 
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/internal/env"
-	"github.com/lonng/nano/internal/message"
-	"github.com/lonng/nano/mock"
+	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/test/mock"
 )
 
 var _ session.NetworkEntity = (*acceptor)(nil)

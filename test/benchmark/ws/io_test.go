@@ -1,0 +1,110 @@
+//go:build benchmark
+// +build benchmark
+
+package ws
+
+import (
+	"net/http"
+	"os"
+	"os/signal"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/lonng/nano"
+	"github.com/lonng/nano/component"
+	"github.com/lonng/nano/protocal/serialize/protobuf"
+	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/test/benchmark/testdata"
+)
+
+const (
+	addr = "127.0.0.1:13250" // local address
+	conc = 1000              // concurrent client count
+)
+
+type TestHandler struct {
+	component.Base
+	metrics int32
+	group   *nano.Group
+}
+
+func (h *TestHandler) AfterInit() {
+	ticker := time.NewTicker(time.Second)
+
+	// metrics output ticker
+	go func() {
+		for range ticker.C {
+			println("QPS", atomic.LoadInt32(&h.metrics))
+			atomic.StoreInt32(&h.metrics, 0)
+		}
+	}()
+}
+
+func NewTestHandler() *TestHandler {
+	return &TestHandler{
+		group: nano.NewGroup("handler"),
+	}
+}
+
+func (h *TestHandler) Ping(s *session.Session, data *testdata.Ping) error {
+	atomic.AddInt32(&h.metrics, 1)
+	return s.Push("pong", &testdata.Pong{Content: data.Content})
+}
+
+func server() {
+	components := &component.Components{}
+	components.Register(NewTestHandler())
+
+	e := nano.New(nano.WithDebugMode(),
+		nano.WithSerializer(protobuf.NewSerializer()),
+		nano.WithComponents(components),
+	)
+	err := e.Startup()
+	if err != nil {
+		return
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/ws", e)
+	http.ListenAndServe(addr, mux)
+}
+
+func client() {
+	c := NewConnector()
+
+	chReady := make(chan struct{})
+	c.OnConnected(func() {
+		chReady <- struct{}{}
+	})
+
+	if err := c.Start(addr); err != nil {
+		panic(err)
+	}
+
+	c.On("pong", func(data any) {})
+
+	<-chReady
+	for /*i := 0; i < 1; i++*/ {
+		c.Notify("TestHandler.Ping", &testdata.Ping{})
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestIO(t *testing.T) {
+	go server()
+
+	// wait server startup
+	time.Sleep(1 * time.Second)
+	for i := 0; i < conc; i++ {
+		go client()
+	}
+
+	sg := make(chan os.Signal)
+	signal.Notify(sg, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL)
+
+	<-sg
+
+	t.Log("exit")
+}

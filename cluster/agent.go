@@ -28,12 +28,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lonng/nano/internal/codec"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/message"
-	"github.com/lonng/nano/internal/packet"
 	"github.com/lonng/nano/pipeline"
+	"github.com/lonng/nano/protocal/codec"
+	"github.com/lonng/nano/protocal/message"
+	"github.com/lonng/nano/protocal/packet"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 )

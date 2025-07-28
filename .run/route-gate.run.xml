@@ -4,9 +4,9 @@
         <working_directory value="$PROJECT_DIR$"/>
         <parameters value="gate --listen &quot;127.0.0.1:34570&quot; --gate-address &quot;127.0.0.1:34590&quot;"/>
         <kind value="PACKAGE"/>
-        <package value="github.com/lonng/nano/examples/customerroute"/>
+        <package value="github.com/lonng/nano/test/examples/customerroute"/>
         <directory value="$PROJECT_DIR$"/>
-        <filePath value="$PROJECT_DIR$/examples/customerroute/main.go"/>
+        <filePath value="$PROJECT_DIR$/test/examples/customerroute/main.go"/>
         <method v="2"/>
     </configuration>
 </component>

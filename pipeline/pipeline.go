@@ -3,7 +3,7 @@ package pipeline
 import (
 	"sync"
 
-	"github.com/lonng/nano/internal/message"
+	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/session"
 )
 

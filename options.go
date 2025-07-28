@@ -8,11 +8,11 @@ import (
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/pipeline"
-	"github.com/lonng/nano/serialize"
-	"github.com/lonng/nano/service"
+	"github.com/lonng/nano/protocal/message"
+	"github.com/lonng/nano/protocal/serialize"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/session/service"
 	"google.golang.org/grpc"
 )
 

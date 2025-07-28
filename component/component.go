@@ -20,13 +20,10 @@
 
 package component
 
-import "github.com/lonng/nano/npi"
-
 var reservedMethods = []string{"Register", "Init", "AfterInit", "BeforeShutdown", "Shutdown"}
 
 // Component is the interface that represent a component.
 type Component interface {
-	Register(npi.IRoutes)
 	Init()
 	AfterInit()
 	BeforeShutdown()

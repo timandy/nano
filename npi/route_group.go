@@ -20,8 +20,8 @@ type RouterGroup struct {
 	root     bool
 }
 
-func NewRootGroup() RouterGroup {
-	return RouterGroup{root: true}
+func NewRootGroup(engine Engine) RouterGroup {
+	return RouterGroup{engine: engine, root: true}
 }
 
 func NewRouterGroup(engine Engine, handlers ...HandlerFunc) *RouterGroup {

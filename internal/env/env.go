@@ -26,8 +26,8 @@ package env
 import (
 	"time"
 
-	"github.com/lonng/nano/serialize"
-	"github.com/lonng/nano/serialize/protobuf"
+	"github.com/lonng/nano/protocal/serialize"
+	"github.com/lonng/nano/protocal/serialize/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
