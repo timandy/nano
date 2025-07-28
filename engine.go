@@ -128,7 +128,7 @@ func (engine *Engine) Startup() error {
 	opts := engine.opts
 	// Use listen address as client address in non-cluster mode
 	if opts.SingleMode() {
-		log.Println("Nano runs in singleton mode")
+		log.Info("Nano runs in singleton mode")
 	}
 
 	engine.node = cluster.NewNode(engine, opts)
@@ -137,7 +137,7 @@ func (engine *Engine) Startup() error {
 		return fmt.Errorf("nano node Startup failed: %v", err)
 	}
 	if opts.ServiceAddr != "" {
-		log.Println(fmt.Sprintf("Nano server started grpc at %s", opts.ServiceAddr))
+		log.Info("Nano server started grpc at %s", opts.ServiceAddr)
 	}
 	go scheduler.Sched()
 	return nil
@@ -190,10 +190,10 @@ func (engine *Engine) Wait() {
 	signal.Notify(sg, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
 	select {
 	case <-env.DieChan:
-		log.Println("Nano server will shutdown in a few seconds")
+		log.Info("Nano server will shutdown in a few seconds")
 	case s := <-sg:
-		log.Println("Nano server got signal", s)
+		log.Info("Nano server got signal", s)
 	}
-	log.Println("Nano server is stopping...")
+	log.Info("Nano server is stopping...")
 	engine.Shutdown()
 }

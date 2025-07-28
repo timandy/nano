@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"github.com/lonng/nano/examples/cluster/chat"
 	"github.com/lonng/nano/examples/cluster/gate"
 	"github.com/lonng/nano/examples/cluster/master"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/serialize/json"
 	"github.com/lonng/nano/session"
 	"github.com/pingcap/errors"
@@ -72,9 +72,8 @@ func main() {
 			Action: runChat,
 		},
 	}
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if err := app.Run(os.Args); err != nil {
-		log.Fatalf("Startup server error %+v", err)
+		log.Fatal("Startup server error.", err)
 	}
 }
 
@@ -90,9 +89,9 @@ func runMaster(args *cli.Context) error {
 	}
 
 	webDir := filepath.Join(srcPath(), "master", "web")
-	log.Println("Nano master server web content directory", webDir)
-	log.Println("Nano master listen address", listen)
-	log.Println("Open http://127.0.0.1:12345/web/ in browser")
+	log.Info("Nano master server web content directory", webDir)
+	log.Info("Nano master listen address", listen)
+	log.Info("Open http://127.0.0.1:12345/web/ in browser")
 
 	http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir(webDir))))
 	go func() {
@@ -112,7 +111,7 @@ func runMaster(args *cli.Context) error {
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithDebugMode(),
 		nano.WithUnregisterCallback(func(m cluster.Member) {
-			log.Println("Todo alarm unregister:", m.String())
+			log.Info("Todo alarm unregister:", m.String())
 		}),
 	)
 
@@ -135,9 +134,9 @@ func runGate(args *cli.Context) error {
 		return errors.Errorf("gate address cannot empty")
 	}
 
-	log.Println("Current server listen address", listen)
-	log.Println("Current gate server address", gateAddr)
-	log.Println("Remote master server address", masterAddr)
+	log.Info("Current server listen address", listen)
+	log.Info("Current gate server address", gateAddr)
+	log.Info("Remote master server address", masterAddr)
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
@@ -164,8 +163,8 @@ func runChat(args *cli.Context) error {
 		return errors.Errorf("master address cannot empty")
 	}
 
-	log.Println("Current chat server listen address", listen)
-	log.Println("Remote master server address", masterAddr)
+	log.Info("Current chat server listen address", listen)
+	log.Info("Remote master server address", masterAddr)
 
 	// Register session closed callback
 	session.Lifetime.OnClosed(chat.OnSessionClosed)

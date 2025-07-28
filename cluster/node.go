@@ -184,7 +184,7 @@ func (n *Node) initNode() error {
 	go func() {
 		err := n.server.Serve(listener)
 		if err != nil {
-			log.Fatalf("Start current node failed: %v", err)
+			log.Fatal("Start current node failed.", err)
 		}
 	}()
 
@@ -219,7 +219,7 @@ func (n *Node) initNode() error {
 				n.cluster.initMembers(resp.Members)
 				break
 			}
-			log.Println("Register current node to cluster failed", err, "and will retry in", env.RetryInterval.String())
+			log.Info("Register current node to cluster failed, and will retry in %v.", env.RetryInterval.String(), err)
 			time.Sleep(env.RetryInterval)
 		}
 		n.once.Do(n.keepalive)
@@ -255,7 +255,7 @@ func (n *Node) Shutdown() {
 	if !n.IsMaster && n.AdvertiseAddr != "" {
 		pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
 		if err != nil {
-			log.Println("Retrieve master address error", err)
+			log.Info("Retrieve master address error.", err)
 			goto EXIT
 		}
 		client := clusterpb.NewMasterClient(pool.Get())
@@ -264,7 +264,7 @@ func (n *Node) Shutdown() {
 		}
 		_, err = client.Unregister(context.Background(), request)
 		if err != nil {
-			log.Println("Unregister current node failed", err)
+			log.Info("Unregister current node failed", err)
 			goto EXIT
 		}
 	}
@@ -279,14 +279,14 @@ EXIT:
 func (n *Node) listenAndServe() {
 	listener, err := net.Listen("tcp", n.TcpAddr)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Start server listen %s error.", n.TcpAddr, err)
 	}
 
 	defer listener.Close()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println(err.Error())
+			log.Info("Accept connection error.", err)
 			continue
 		}
 
@@ -304,7 +304,7 @@ func (n *Node) WsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println(fmt.Sprintf("Upgrade failure, URI=%s, Error=%s", r.RequestURI, err.Error()))
+			log.Info("Upgrade failure, URI=%s", r.RequestURI, err)
 			return
 		}
 		n.handler.handleWS(conn)
@@ -403,7 +403,7 @@ func (n *Node) NewMember(_ context.Context, req *clusterpb.NewMemberRequest) (*c
 }
 
 func (n *Node) DelMember(_ context.Context, req *clusterpb.DelMemberRequest) (*clusterpb.DelMemberResponse, error) {
-	log.Println("DelMember member", req.String())
+	log.Info("DelMember member", req.String())
 	n.handler.delMember(req.ServiceAddr)
 	n.cluster.delMember(req.ServiceAddr)
 	return &clusterpb.DelMemberResponse{}, nil
@@ -448,7 +448,7 @@ func (n *Node) keepalive() {
 			case <-ticker.C:
 				n.heartbeat()
 			case <-n.keepaliveExit:
-				log.Println("Exit member node heartbeat ")
+				log.Info("Exit member node heartbeat ")
 				ticker.Stop()
 				return
 			}
@@ -459,7 +459,7 @@ func (n *Node) keepalive() {
 func (n *Node) heartbeat() {
 	pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
 	if err != nil {
-		log.Println("rpcClient master conn", err)
+		log.Info("rpcClient master conn", err)
 		return
 	}
 	masterCli := clusterpb.NewMasterClient(pool.Get())
@@ -470,6 +470,6 @@ func (n *Node) heartbeat() {
 			Services:    n.handler.LocalService(),
 		},
 	}); err != nil {
-		log.Println("Member send heartbeat error", err)
+		log.Info("Member send heartbeat error", err)
 	}
 }

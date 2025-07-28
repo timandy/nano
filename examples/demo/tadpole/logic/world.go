@@ -1,13 +1,11 @@
 package logic
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/google/uuid"
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/examples/demo/tadpole/logic/protocol"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/session"
 )
 
@@ -29,14 +27,14 @@ func (w *World) Init() {
 	session.Lifetime.OnClosed(func(s *session.Session) {
 		w.Leave(s)
 		w.Broadcast("leave", &protocol.LeaveWorldResponse{ID: s.ID()})
-		log.Println(fmt.Sprintf("session count: %d", w.Count()))
+		log.Info("session count: %d", w.Count())
 	})
 }
 
 // Enter was called when new guest enter
 func (w *World) Enter(s *session.Session, msg []byte) error {
 	w.Add(s)
-	log.Println(fmt.Sprintf("session count: %d", w.Count()))
+	log.Info("session count: %d", w.Count())
 	return s.Response(&protocol.EnterWorldResponse{ID: s.ID()})
 }
 

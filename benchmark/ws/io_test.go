@@ -4,7 +4,6 @@
 package ws
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -101,8 +100,6 @@ func TestIO(t *testing.T) {
 	for i := 0; i < conc; i++ {
 		go client()
 	}
-
-	log.SetFlags(log.LstdFlags | log.Llongfile)
 
 	sg := make(chan os.Signal)
 	signal.Notify(sg, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL)

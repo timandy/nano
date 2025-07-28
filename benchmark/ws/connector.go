@@ -22,11 +22,11 @@ package ws
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/lonng/nano/internal/codec"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
 	"google.golang.org/protobuf/proto"
@@ -198,7 +198,7 @@ func (c *Connector) sendMessage(msg *message.Message) error {
 		return err
 	}
 
-	//log.Printf("%+v",msg)
+	//log.Printf("%v",msg)
 
 	payload, err := codec.Encode(packet.Data, data)
 	if err != nil {
@@ -218,7 +218,7 @@ func (c *Connector) write() {
 		select {
 		case data := <-c.chSend:
 			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Println(err.Error())
+				log.Info(err.Error())
 				c.Close()
 			}
 
@@ -236,14 +236,14 @@ func (c *Connector) read() {
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Println(err.Error())
+			log.Info(err.Error())
 			c.Close()
 			return
 		}
 
 		packets, err := c.codec.Decode(buf)
 		if err != nil {
-			log.Println(err.Error())
+			log.Info(err.Error())
 			c.Close()
 			return
 		}
@@ -263,7 +263,7 @@ func (c *Connector) processPacket(p *packet.Packet) {
 	case packet.Data:
 		msg, err := message.Decode(p.Data)
 		if err != nil {
-			log.Println(err.Error())
+			log.Info(err.Error())
 			return
 		}
 		c.processMessage(msg)
@@ -278,7 +278,7 @@ func (c *Connector) processMessage(msg *message.Message) {
 	case message.Push:
 		cb, ok := c.eventHandler(msg.Route)
 		if !ok {
-			log.Println("event handler not found", msg.Route)
+			log.Info("event handler not found", msg.Route)
 			return
 		}
 
@@ -287,7 +287,7 @@ func (c *Connector) processMessage(msg *message.Message) {
 	case message.Response:
 		cb, ok := c.responseHandler(msg.ID)
 		if !ok {
-			log.Println("response handler not found", msg.ID)
+			log.Info("response handler not found", msg.ID)
 			return
 		}
 

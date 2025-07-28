@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/lonng/nano/cluster/clusterpb"
+	"github.com/lonng/nano/internal/log"
 
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/examples/customerroute/onegate"
@@ -73,9 +73,8 @@ func main() {
 			Action: runChat,
 		},
 	}
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if err := app.Run(os.Args); err != nil {
-		log.Fatalf("Startup server error %+v", err)
+		log.Fatal("Startup server error.", err)
 	}
 }
 
@@ -91,9 +90,9 @@ func runMaster(args *cli.Context) error {
 	}
 
 	webDir := filepath.Join(srcPath(), "onemaster", "web")
-	log.Println("Nano master server web content directory", webDir)
-	log.Println("Nano master listen address", listen)
-	log.Println("Open http://127.0.0.1:12345/web/ in browser")
+	log.Info("Nano master server web content directory", webDir)
+	log.Info("Nano master listen address", listen)
+	log.Info("Open http://127.0.0.1:12345/web/ in browser")
 
 	http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir(webDir))))
 	go func() {
@@ -128,9 +127,9 @@ func runGate(args *cli.Context) error {
 		return errors.Errorf("gate address cannot empty")
 	}
 
-	log.Println("Current server listen address", listen)
-	log.Println("Current gate server address", gateAddr)
-	log.Println("Remote master server address", masterAddr)
+	log.Info("Current server listen address", listen)
+	log.Info("Current gate server address", gateAddr)
+	log.Info("Remote master server address", masterAddr)
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
@@ -158,8 +157,8 @@ func runChat(args *cli.Context) error {
 		return errors.Errorf("master address cannot empty")
 	}
 
-	log.Println("Current chat server listen address", listen)
-	log.Println("Remote master server address", masterAddr)
+	log.Info("Current chat server listen address", listen)
+	log.Info("Remote master server address", masterAddr)
 
 	// Register session closed callback
 	session.Lifetime.OnClosed(tworoom.OnSessionClosed)

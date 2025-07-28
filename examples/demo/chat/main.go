@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -154,8 +153,6 @@ func main() {
 	var stats = &stats{}
 	pip.Outbound().PushBack(stats.outbound)
 	pip.Inbound().PushBack(stats.inbound)
-
-	log.SetFlags(log.LstdFlags | log.Llongfile)
 
 	e := nano.New(
 		nano.WithPipeline(pip),

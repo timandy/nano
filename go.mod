@@ -10,6 +10,7 @@ require (
 	github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0
 	github.com/pingcap/errors v0.11.4
 	github.com/stretchr/testify v1.10.0
+	github.com/timandy/routine v1.1.5
 	github.com/urfave/cli/v2 v2.27.7
 	google.golang.org/grpc v1.64.1 // The latest version support go1.20
 	google.golang.org/protobuf v1.34.2 // The latest version support go1.20

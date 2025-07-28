@@ -2,11 +2,11 @@ package chat
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/examples/cluster/protocol"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/session"
 	"github.com/pingcap/errors"
 )
@@ -53,8 +53,8 @@ func (rs *RoomService) SyncMessage(s *session.Session, msg *SyncMessage) error {
 
 func (rs *RoomService) userDisconnected(s *session.Session) {
 	if err := rs.group.Leave(s); err != nil {
-		log.Println("Remove user from group failed", s.UID(), err)
+		log.Info("Remove user from group failed", s.UID(), err)
 		return
 	}
-	log.Println("User session disconnected", s.UID())
+	log.Info("User session disconnected", s.UID())
 }

@@ -1,11 +1,11 @@
 package master
 
 import (
-	"log"
 	"strings"
 
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/examples/cluster/protocol"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/session"
 	"github.com/pingcap/errors"
 )
@@ -86,5 +86,5 @@ func (ts *TopicService) Stats(s *session.Session, msg *protocol.MasterStats) err
 func (ts *TopicService) userDisconnected(s *session.Session) {
 	uid := s.UID()
 	delete(ts.users, uid)
-	log.Println("User session disconnected", s.UID())
+	log.Info("User session disconnected", s.UID())
 }

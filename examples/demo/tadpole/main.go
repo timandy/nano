@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,9 +51,6 @@ func serve(ctx *cli.Context) error {
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithCheckOrigin(func(_ *http.Request) bool { return true }),
 	}
-
-	//nano.EnableDebug()
-	log.SetFlags(log.LstdFlags | log.Llongfile)
 
 	addr := ctx.String("addr")
 	e := nano.New(options...)

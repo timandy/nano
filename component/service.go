@@ -164,14 +164,14 @@ func (h *Handler) Call(c *nap.Context) {
 	args, err := h.ResolveArgs(c)
 	if err != nil {
 		c.Error(err)
-		log.Println("handler call resolve args error:", err)
+		log.Info("handler call resolve args error.", err)
 		return
 	}
 	retValues := h.handlerValue.Call(args)
 	response, err := h.ResolveReturnValues(retValues)
 	if err != nil {
 		c.Error(err)
-		log.Println("handler call resolve return values error:", err)
+		log.Info("handler call resolve return values error.", err)
 		return
 	}
 	if response == nil {
@@ -180,7 +180,7 @@ func (h *Handler) Call(c *nap.Context) {
 	err = c.Response(response)
 	if err != nil {
 		c.Error(err)
-		log.Println("handler call response error:", err)
+		log.Info("handler call response error.", err)
 	}
 }
 

@@ -90,7 +90,7 @@ func (c *cluster) Register(_ context.Context, req *clusterpb.RegisterRequest) (*
 		}
 	}
 
-	log.Println("New peer register to cluster", req.MemberInfo.ServiceAddr)
+	log.Info("New peer register to cluster", req.MemberInfo.ServiceAddr)
 
 	// Register services to current node
 	c.currentNode.handler.addRemoteService(req.MemberInfo)
@@ -140,7 +140,7 @@ func (c *cluster) Unregister(_ context.Context, req *clusterpb.UnregisterRequest
 		}
 	}
 
-	log.Println("Exists peer unregister to cluster", req.ServiceAddr)
+	log.Info("Exists peer unregister to cluster", req.ServiceAddr)
 
 	if c.currentNode.UnregisterCallback != nil {
 		c.currentNode.UnregisterCallback(*c.members[index])
@@ -180,7 +180,7 @@ func (c *cluster) Heartbeat(_ context.Context, req *clusterpb.HeartbeatRequest) 
 		}
 		c.members = append(c.members, m)
 		c.currentNode.handler.addRemoteService(req.MemberInfo)
-		log.Println("Heartbeat peer register to cluster", req.MemberInfo.ServiceAddr)
+		log.Info("Heartbeat peer register to cluster", req.MemberInfo.ServiceAddr)
 	}
 	return &clusterpb.HeartbeatResponse{}, nil
 }
@@ -215,7 +215,7 @@ func (c *cluster) checkHeartbeat() {
 			ServiceAddr: m.MemberInfo().ServiceAddr,
 		}
 		if _, err := c.Unregister(context.Background(), req); err != nil {
-			log.Println("Heartbeat unregister error", err)
+			log.Info("Heartbeat unregister error.", err)
 		}
 	}
 }

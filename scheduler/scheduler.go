@@ -21,13 +21,12 @@
 package scheduler
 
 import (
-	"fmt"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
+	"github.com/timandy/routine"
 )
 
 // LocalScheduler schedules task to a customized goroutine
@@ -50,7 +49,7 @@ var (
 func try(f func()) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Println(fmt.Sprintf("Handle message panic: %+v\n%s", err, debug.Stack()))
+			log.Info("Handle message panic.", routine.NewRuntimeError(err))
 		}
 	}()
 	f()
@@ -87,7 +86,7 @@ func Close() {
 	}
 	close(chDie)
 	<-chExit
-	log.Println("Scheduler stopped")
+	log.Info("Scheduler stopped")
 }
 
 func PushTask(task Task) {
