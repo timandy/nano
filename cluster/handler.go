@@ -448,6 +448,7 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 		c.Reset()
 		//初始化
 		c.Mid = lastMid
+		c.RoutePath = msg.Route
 		c.Service = service
 		c.Msg = msg
 		c.Session = session

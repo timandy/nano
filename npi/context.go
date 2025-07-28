@@ -18,6 +18,7 @@ const abortIndex int8 = math.MaxInt8 >> 1
 
 type Context struct {
 	Mid         uint64           //消息id
+	RoutePath   string           //路由路径, 例如 Room.Join
 	Service     string           //服务名, 例如路由 Room.Join 的 Service 为 Room
 	Msg         *message.Message //消息
 	Session     *session.Session //会话
@@ -29,6 +30,7 @@ type Context struct {
 // Reset 从池获取后立即重置
 func (c *Context) Reset() {
 	c.Mid = 0
+	c.RoutePath = ""
 	c.Service = ""
 	c.Msg = nil
 	c.Session = nil

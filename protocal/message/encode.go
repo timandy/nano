@@ -93,9 +93,9 @@ func Decode(data []byte) (*Message, error) {
 
 	if m.Type == Request || m.Type == Response {
 		id := uint64(0)
-		// little end byte order
-		// WARNING: must can be stored in 64 bits integer
-		// variant length encode
+		// 小端字节顺序
+		// 注意: 只能存 64 位整数
+		// 变长整数解码
 		for i := offset; i < len(data); i++ {
 			b := data[i]
 			id += uint64(b&0x7F) << uint64(7*(i-offset))
