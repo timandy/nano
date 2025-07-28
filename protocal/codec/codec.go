@@ -38,7 +38,7 @@ var ErrPacketSizeExcced = errors.New("codec: packet size exceed")
 
 // A Decoder reads and decodes network data slice
 type Decoder struct {
-	buf  *bytes.Buffer
+	buf  bytes.Buffer
 	size int  // last packet length
 	typ  byte // last packet type
 }
@@ -46,7 +46,6 @@ type Decoder struct {
 // NewDecoder returns a new decoder that used for decode network bytes slice.
 func NewDecoder() *Decoder {
 	return &Decoder{
-		buf:  bytes.NewBuffer(nil),
 		size: -1,
 	}
 }
