@@ -37,7 +37,7 @@ import (
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
 	"github.com/lonng/nano/internal/packet"
-	"github.com/lonng/nano/nap"
+	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
@@ -53,8 +53,8 @@ type UnregisterCallback func(Member)
 
 type LocalHandler struct {
 	localServices map[string]*component.Service // all registered service
-	localHandlers nap.HandlerTrees              // all handler methods
-	allNoRoutes   *nap.HandlerNode              // no routes handler methods
+	localHandlers npi.HandlerTrees              // all handler methods
+	allNoRoutes   *npi.HandlerNode              // no routes handler methods
 
 	mu             sync.RWMutex
 	remoteServices map[string][]*clusterpb.MemberInfo
@@ -77,22 +77,22 @@ func NewHandler(currentNode *Node) *LocalHandler {
 	}
 }
 
-func getTrees(engine nap.Engine) nap.HandlerTrees {
+func getTrees(engine npi.Engine) npi.HandlerTrees {
 	if engine == nil {
-		return nap.HandlerTrees{}
+		return npi.HandlerTrees{}
 	}
 	trees := engine.Trees()
 	if trees == nil {
-		return nap.HandlerTrees{}
+		return npi.HandlerTrees{}
 	}
 	return trees
 }
 
-func getAllNoRoutes(engine nap.Engine) *nap.HandlerNode {
+func getAllNoRoutes(engine npi.Engine) *npi.HandlerNode {
 	if engine == nil {
-		return nap.NewHandlerNode()
+		return npi.NewHandlerNode()
 	}
-	return nap.NewHandlerNode(engine.AllNoRoutes()...)
+	return npi.NewHandlerNode(engine.AllNoRoutes()...)
 }
 
 func (h *LocalHandler) scan(comp component.Component, opts []component.Option) error {
@@ -111,7 +111,7 @@ func (h *LocalHandler) scan(comp component.Component, opts []component.Option) e
 	for name, handler := range s.Handlers {
 		route := fmt.Sprintf("%s.%s", s.Name, name)
 		log.Info("Register local handler", route)
-		h.localHandlers.Append(route, nap.NewHandlerNodeWithName(name, handler.Call))
+		h.localHandlers.Append(route, npi.NewHandlerNodeWithName(name, handler.Call))
 	}
 	return nil
 }
@@ -414,7 +414,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 }
 
 // localProcess 本地处理
-func (h *LocalHandler) localProcess(handlerNode *nap.HandlerNode, lastMid uint64, session *session.Session, msg *message.Message) {
+func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64, session *session.Session, msg *message.Message) {
 	if pipe := h.pipeline; pipe != nil {
 		err := pipe.Inbound().Process(session, msg)
 		if err != nil {
@@ -443,7 +443,7 @@ func (h *LocalHandler) localProcess(handlerNode *nap.HandlerNode, lastMid uint64
 		}
 		//获取 Context
 		pool := &h.opts.Pool
-		c := pool.Get().(*nap.Context)
+		c := pool.Get().(*npi.Context)
 		defer pool.Put(c)
 		c.Reset()
 		//初始化

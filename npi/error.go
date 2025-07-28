@@ -1,3 +1,3 @@
-package nap
+package npi
 
 type errorMsgs []error

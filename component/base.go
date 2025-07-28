@@ -20,9 +20,7 @@
 
 package component
 
-import (
-	"github.com/lonng/nano/nap"
-)
+import "github.com/lonng/nano/npi"
 
 var _ Component = (*Base)(nil)
 
@@ -30,7 +28,7 @@ var _ Component = (*Base)(nil)
 type Base struct {
 }
 
-func (c *Base) Register(nap.IRoutes) {}
+func (c *Base) Register(npi.IRoutes) {}
 
 // Init was called to initialize the component.
 func (c *Base) Init() {}

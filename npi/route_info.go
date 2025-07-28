@@ -1,4 +1,4 @@
-package nap
+package npi
 
 // RouteInfo represents a request route's specification which contains method and path and its handler.
 type RouteInfo struct {

@@ -25,7 +25,7 @@ import (
 	"reflect"
 
 	"github.com/lonng/nano/internal/log"
-	"github.com/lonng/nano/nap"
+	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/serialize/protobuf"
 )
 
@@ -160,7 +160,7 @@ func newHandler(receiver, handlerValue reflect.Value) *Handler {
 }
 
 // Call 执行处理函数
-func (h *Handler) Call(c *nap.Context) {
+func (h *Handler) Call(c *npi.Context) {
 	args, err := h.ResolveArgs(c)
 	if err != nil {
 		c.Error(err)
@@ -185,7 +185,7 @@ func (h *Handler) Call(c *nap.Context) {
 }
 
 // ResolveArgs 解析入参
-func (h *Handler) ResolveArgs(c *nap.Context) ([]reflect.Value, error) {
+func (h *Handler) ResolveArgs(c *npi.Context) ([]reflect.Value, error) {
 	args := make([]reflect.Value, len(h.argTypes))
 	for i, argType := range h.argTypes {
 		arg, err := h.ResolveArg(c, i, argType)
@@ -198,13 +198,13 @@ func (h *Handler) ResolveArgs(c *nap.Context) ([]reflect.Value, error) {
 }
 
 // ResolveArg 解析单个入参
-func (h *Handler) ResolveArg(c *nap.Context, i int, argType reflect.Type) (reflect.Value, error) {
+func (h *Handler) ResolveArg(c *npi.Context, i int, argType reflect.Type) (reflect.Value, error) {
 	// 方法的接收者
 	if i == 0 && h.IsMethod {
 		return h.Receiver, nil
 	}
 	// Context 类型
-	if argType == nap.ContextType {
+	if argType == npi.ContextType {
 		return reflect.ValueOf(c), nil
 	}
 	// *Session 类型

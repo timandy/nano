@@ -34,22 +34,22 @@ import (
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/utils/assert"
-	"github.com/lonng/nano/nap"
+	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/scheduler"
 )
 
 // VERSION returns current nano version
 var VERSION = "0.5.0"
 
-var _ nap.Engine = (*Engine)(nil)
+var _ npi.Engine = (*Engine)(nil)
 
 // Engine 引擎
 type Engine struct {
-	nap.RouterGroup
+	npi.RouterGroup
 
-	trees      nap.HandlerTrees
-	allNoRoute nap.HandlersChain
-	noRoute    nap.HandlersChain
+	trees      npi.HandlerTrees
+	allNoRoute npi.HandlersChain
+	noRoute    npi.HandlersChain
 
 	running int32
 	node    *cluster.Node
@@ -63,8 +63,8 @@ func New(opts ...Option) *Engine {
 		opt(options)
 	}
 	return &Engine{
-		RouterGroup: nap.NewRootGroup(),
-		trees:       nap.HandlerTrees{},
+		RouterGroup: npi.NewRootGroup(),
+		trees:       npi.HandlerTrees{},
 		allNoRoute:  nil,
 		noRoute:     nil,
 		running:     0,
@@ -78,7 +78,7 @@ func (engine *Engine) Options() *cluster.Options {
 }
 
 // NoRoute 为 NoRoute 添加处理程序。默认情况下，它返回一个 404 代码。
-func (engine *Engine) NoRoute(handlers ...nap.HandlerFunc) {
+func (engine *Engine) NoRoute(handlers ...npi.HandlerFunc) {
 	engine.noRoute = handlers
 	engine.rebuild404Handlers()
 }
@@ -89,18 +89,18 @@ func (engine *Engine) rebuild404Handlers() {
 }
 
 // AddRoute 添加路由
-func (engine *Engine) AddRoute(route string, handlers ...nap.HandlerFunc) {
+func (engine *Engine) AddRoute(route string, handlers ...npi.HandlerFunc) {
 	assert.Assert(strings.Contains(route, "."), "route should contains '.'")
 	assert.Assert(len(handlers) > 0, "there must be at least one handler")
 
-	engine.trees.Append(route, nap.NewHandlerNode(handlers...))
+	engine.trees.Append(route, npi.NewHandlerNode(handlers...))
 }
 
 // Routes 获取注册的路由信息
-func (engine *Engine) Routes() nap.RoutesInfo {
-	var routes nap.RoutesInfo
+func (engine *Engine) Routes() npi.RoutesInfo {
+	var routes npi.RoutesInfo
 	for route, node := range engine.trees {
-		routes = append(routes, nap.RouteInfo{
+		routes = append(routes, npi.RouteInfo{
 			Route:       route,
 			Handler:     node.Name(),
 			HandlerFunc: node.Handlers().Last(),
@@ -110,12 +110,12 @@ func (engine *Engine) Routes() nap.RoutesInfo {
 }
 
 // Trees 获取全部路由处理程序
-func (engine *Engine) Trees() nap.HandlerTrees {
+func (engine *Engine) Trees() npi.HandlerTrees {
 	return engine.trees
 }
 
 // AllNoRoutes 获取无路由的处理程序
-func (engine *Engine) AllNoRoutes() nap.HandlersChain {
+func (engine *Engine) AllNoRoutes() npi.HandlersChain {
 	return engine.allNoRoute
 }
 

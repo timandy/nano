@@ -1,4 +1,4 @@
-package nap
+package npi
 
 type HandlerTrees map[string]*HandlerNode
 

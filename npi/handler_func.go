@@ -1,4 +1,4 @@
-package nap
+package npi
 
 // HandlerFunc defines the handler used by gin middleware as return value.
 type HandlerFunc func(*Context)

@@ -34,7 +34,7 @@ import (
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/message"
-	"github.com/lonng/nano/nap"
+	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
@@ -79,7 +79,7 @@ func DefaultOptions() *Options {
 		IsMaster: false, //默认不是主节点
 	}
 	opts.Pool.New = func() any {
-		return &nap.Context{}
+		return &npi.Context{}
 	}
 	return &opts
 }
@@ -93,7 +93,7 @@ func (o *Options) SingleMode() bool {
 // Node 表示 nano 集群中的一个节点，该节点将包含一组服务。
 // 所有服务都将注册到集群，消息将通过 grpc 转发到节点提供相应的服务。
 type Node struct {
-	engine   nap.Engine //引擎
+	engine   npi.Engine //引擎
 	*Options            //选项
 
 	cluster   *cluster
@@ -109,7 +109,7 @@ type Node struct {
 }
 
 // NewNode 创建新的节点
-func NewNode(engine nap.Engine, opts *Options) *Node {
+func NewNode(engine npi.Engine, opts *Options) *Node {
 	return &Node{
 		engine:  engine,
 		Options: opts,

@@ -1,4 +1,4 @@
-package nap
+package npi
 
 import (
 	"github.com/lonng/nano/internal/utils/assert"
@@ -46,7 +46,8 @@ func (group *RouterGroup) Use(handler ...HandlerFunc) IRoutes {
 }
 
 func (group *RouterGroup) Handle(route string, handler ...HandlerFunc) IRoutes {
-	group.engine.AddRoute(route, handler...)
+	handlers := group.CombineHandlers(handler)
+	group.engine.AddRoute(route, handlers...)
 	return group.returnObj()
 }
 

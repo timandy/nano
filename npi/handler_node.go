@@ -1,4 +1,4 @@
-package nap
+package npi
 
 import "github.com/lonng/nano/internal/utils/reflection"
 
