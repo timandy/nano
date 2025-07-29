@@ -46,22 +46,19 @@ var (
 	ErrIllegalUID = errors.New("illegal uid")
 )
 
-// Session represents a client session which could storage temp data during low-level
-// keep connected, all data will be released when the low-level connection was broken.
-// Session instance related to the client will be passed to Handler method as the first
-// parameter.
+// Session 会话表示一个客户端会话，可以在低级保持连接期间存储临时数据，当低级连接断开时，所有数据都会被释放。
+// 与客户端相关的会话实例将作为第一个参数传递给构造函数。
 type Session struct {
-	sync.RWMutex                // protect data
-	id           int64          // session global unique id
-	uid          int64          // binding user id
-	lastTime     int64          // last heartbeat time
-	entity       NetworkEntity  // low-level network entity
-	data         map[string]any // session data store
-	router       *Router
+	mu       sync.RWMutex   // protect data
+	id       int64          // session global unique id
+	uid      int64          // binding user id
+	lastTime int64          // last heartbeat time
+	entity   NetworkEntity  // low-level network entity
+	data     map[string]any // session data store
+	router   *Router
 }
 
-// New returns a new session instance
-// a NetworkEntity is a low-level network instance
+// New 返回新的会话实例 NetworkEntity 是低级网络实例
 func New(entity NetworkEntity) *Session {
 	return &Session{
 		id:       service.Connections.SessionID(),
@@ -72,7 +69,7 @@ func New(entity NetworkEntity) *Session {
 	}
 }
 
-// NetworkEntity returns the low-level network agent object
+// NetworkEntity 返回低级网络代理对象
 func (s *Session) NetworkEntity() NetworkEntity {
 	return s.entity
 }
@@ -82,23 +79,22 @@ func (s *Session) Router() *Router {
 	return s.router
 }
 
-// RPC sends message to remote server
+// RPC 将消息发送到远程服务器
 func (s *Session) RPC(route string, v any) error {
 	return s.entity.RPC(route, v)
 }
 
-// Push message to client
+// Push 推送消息给客户端
 func (s *Session) Push(route string, v any) error {
 	return s.entity.Push(route, v)
 }
 
-// Response message to client
+// Response 响应消息给客户端
 func (s *Session) Response(v any) error {
 	return s.entity.Response(v)
 }
 
-// ResponseMID responses message to client, mid is
-// request message ID
+// ResponseMID 响应消息给客户端，mid 是请求消息 ID
 func (s *Session) ResponseMID(mid uint64, v any) error {
 	return s.entity.ResponseMid(mid, v)
 }
@@ -128,12 +124,6 @@ func (s *Session) Bind(uid int64) error {
 	return nil
 }
 
-// Close terminate current session, session related data will not be released,
-// all related data should be Clear explicitly in Session closed callback
-func (s *Session) Close() {
-	s.entity.Close()
-}
-
 // RemoteAddr returns the remote network address.
 func (s *Session) RemoteAddr() net.Addr {
 	return s.entity.RemoteAddr()
@@ -141,24 +131,24 @@ func (s *Session) RemoteAddr() net.Addr {
 
 // Remove delete data associated with the key from session storage
 func (s *Session) Remove(key string) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	delete(s.data, key)
 }
 
 // Set associates value with the key in session storage
 func (s *Session) Set(key string, value any) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.data[key] = value
 }
 
 // HasKey decides whether a key has associated value
 func (s *Session) HasKey(key string) bool {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	_, has := s.data[key]
 	return has
@@ -166,8 +156,8 @@ func (s *Session) HasKey(key string) bool {
 
 // Int returns the value associated with the key as a int.
 func (s *Session) Int(key string) int {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -183,8 +173,8 @@ func (s *Session) Int(key string) int {
 
 // Int8 returns the value associated with the key as a int8.
 func (s *Session) Int8(key string) int8 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -200,8 +190,8 @@ func (s *Session) Int8(key string) int8 {
 
 // Int16 returns the value associated with the key as a int16.
 func (s *Session) Int16(key string) int16 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -217,8 +207,8 @@ func (s *Session) Int16(key string) int16 {
 
 // Int32 returns the value associated with the key as a int32.
 func (s *Session) Int32(key string) int32 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -234,8 +224,8 @@ func (s *Session) Int32(key string) int32 {
 
 // Int64 returns the value associated with the key as a int64.
 func (s *Session) Int64(key string) int64 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -251,8 +241,8 @@ func (s *Session) Int64(key string) int64 {
 
 // Uint returns the value associated with the key as a uint.
 func (s *Session) Uint(key string) uint {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -268,8 +258,8 @@ func (s *Session) Uint(key string) uint {
 
 // Uint8 returns the value associated with the key as a uint8.
 func (s *Session) Uint8(key string) uint8 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -285,8 +275,8 @@ func (s *Session) Uint8(key string) uint8 {
 
 // Uint16 returns the value associated with the key as a uint16.
 func (s *Session) Uint16(key string) uint16 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -302,8 +292,8 @@ func (s *Session) Uint16(key string) uint16 {
 
 // Uint32 returns the value associated with the key as a uint32.
 func (s *Session) Uint32(key string) uint32 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -319,8 +309,8 @@ func (s *Session) Uint32(key string) uint32 {
 
 // Uint64 returns the value associated with the key as a uint64.
 func (s *Session) Uint64(key string) uint64 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -336,8 +326,8 @@ func (s *Session) Uint64(key string) uint64 {
 
 // Float32 returns the value associated with the key as a float32.
 func (s *Session) Float32(key string) float32 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -353,8 +343,8 @@ func (s *Session) Float32(key string) float32 {
 
 // Float64 returns the value associated with the key as a float64.
 func (s *Session) Float64(key string) float64 {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -370,8 +360,8 @@ func (s *Session) Float64(key string) float64 {
 
 // String returns the value associated with the key as a string.
 func (s *Session) String(key string) string {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -387,33 +377,38 @@ func (s *Session) String(key string) string {
 
 // Value returns the value associated with the key as a any.
 func (s *Session) Value(key string) any {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return s.data[key]
 }
 
-// State returns all session state
+// State 返回所有会话所有数据
 func (s *Session) State() map[string]any {
-	s.RLock()
-	defer s.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return s.data
 }
 
-// Restore session state after reconnect
+// Restore 重新连接后的会话数据
 func (s *Session) Restore(data map[string]any) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.data = data
 }
 
-// Clear releases all data related to current session
+// Clear 释放与当前会话相关的所有数据
 func (s *Session) Clear() {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	s.uid = 0
+	atomic.StoreInt64(&s.uid, 0)
 	s.data = map[string]any{}
+}
+
+// Close 终止当前会话，会话相关数据将不会被释放，所有相关数据都应在会话关闭回调中显式清除
+func (s *Session) Close() {
+	_ = s.entity.Close()
 }

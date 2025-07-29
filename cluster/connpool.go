@@ -34,12 +34,6 @@ type connPool struct {
 	v     []*grpc.ClientConn
 }
 
-type rpcClient struct {
-	sync.RWMutex
-	isClosed bool
-	pools    map[string]*connPool
-}
-
 func newConnArray(maxSize uint, addr string) (*connPool, error) {
 	a := &connPool{
 		index: 0,
@@ -81,6 +75,14 @@ func (a *connPool) Close() {
 	}
 }
 
+//====
+
+type rpcClient struct {
+	mu       sync.RWMutex
+	isClosed bool
+	pools    map[string]*connPool
+}
+
 func newRPCClient() *rpcClient {
 	return &rpcClient{
 		pools: make(map[string]*connPool),
@@ -88,47 +90,54 @@ func newRPCClient() *rpcClient {
 }
 
 func (c *rpcClient) getConnPool(addr string) (*connPool, error) {
-	c.RLock()
+	pool, found, err := c.findConnPool(addr)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return pool, nil
+	}
+	return c.createConnPool(addr)
+}
+
+func (c *rpcClient) findConnPool(addr string) (*connPool, bool, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.isClosed {
-		c.RUnlock()
-		return nil, errors.New("rpc client is closed")
+		return nil, false, errors.New("rpc client is closed")
 	}
-	array, ok := c.pools[addr]
-	c.RUnlock()
-	if !ok {
-		var err error
-		array, err = c.createConnPool(addr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return array, nil
+	pool, found := c.pools[addr]
+	return pool, found, nil
 }
 
 func (c *rpcClient) createConnPool(addr string) (*connPool, error) {
-	c.Lock()
-	defer c.Unlock()
-	array, ok := c.pools[addr]
-	if !ok {
-		var err error
-		// TODO: make conn count configurable
-		array, err = newConnArray(10, addr)
-		if err != nil {
-			return nil, err
-		}
-		c.pools[addr] = array
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.isClosed {
+		return nil, errors.New("rpc client is closed")
 	}
-	return array, nil
+	pool, found := c.pools[addr]
+	if found {
+		return pool, nil
+	}
+	// TODO: make conn count configurable
+	pool, err := newConnArray(10, addr)
+	if err != nil {
+		return nil, err
+	}
+	c.pools[addr] = pool
+	return pool, nil
 }
 
 func (c *rpcClient) closePool() {
-	c.Lock()
-	if !c.isClosed {
-		c.isClosed = true
-		// close all connections
-		for _, array := range c.pools {
-			array.Close()
-		}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.isClosed {
+		return
 	}
-	c.Unlock()
+	c.isClosed = true
+	// close all connections
+	for _, array := range c.pools {
+		array.Close()
+	}
 }

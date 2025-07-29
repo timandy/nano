@@ -327,22 +327,11 @@ func (n *Node) listenAndServe() {
 }
 
 func (n *Node) storeSession(s *session.Session) {
-	n.mu.Lock()
-	n.sessions[s.ID()] = s
-	n.mu.Unlock()
-}
-
-func (n *Node) findSession(sid int64) *session.Session {
-	n.mu.RLock()
-	s := n.sessions[sid]
-	n.mu.RUnlock()
-	return s
+	n.saveSession(s.ID(), s)
 }
 
 func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session, error) {
-	n.mu.RLock()
-	s, found := n.sessions[sid]
-	n.mu.RUnlock()
+	s, found := n.findSession(sid)
 	if !found {
 		conns, err := n.rpcClient.getConnPool(gateAddr)
 		if err != nil {
@@ -351,9 +340,7 @@ func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session
 		ac := newAcceptor(sid, clusterpb.NewMemberClient(conns.Get()), n.handler.remoteProcess, gateAddr)
 		s = session.New(ac)
 		ac.session = s
-		n.mu.Lock()
-		n.sessions[sid] = s
-		n.mu.Unlock()
+		n.saveSession(sid, s)
 	}
 	return s, nil
 }
@@ -396,16 +383,16 @@ func (n *Node) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*c
 }
 
 func (n *Node) HandlePush(_ context.Context, req *clusterpb.PushMessage) (*clusterpb.MemberHandleResponse, error) {
-	s := n.findSession(req.SessionId)
-	if s == nil {
+	s, found := n.findSession(req.SessionId)
+	if !found {
 		return &clusterpb.MemberHandleResponse{}, fmt.Errorf("session not found: %v", req.SessionId)
 	}
 	return &clusterpb.MemberHandleResponse{}, s.Push(req.Route, req.Data)
 }
 
 func (n *Node) HandleResponse(_ context.Context, req *clusterpb.ResponseMessage) (*clusterpb.MemberHandleResponse, error) {
-	s := n.findSession(req.SessionId)
-	if s == nil {
+	s, found := n.findSession(req.SessionId)
+	if !found {
 		return &clusterpb.MemberHandleResponse{}, fmt.Errorf("session not found: %v", req.SessionId)
 	}
 	return &clusterpb.MemberHandleResponse{}, s.ResponseMID(req.Id, req.Data)
@@ -424,31 +411,49 @@ func (n *Node) DelMember(_ context.Context, req *clusterpb.DelMemberRequest) (*c
 	return &clusterpb.DelMemberResponse{}, nil
 }
 
-// SessionClosed implements the MemberServer interface
+// SessionClosed 作为业务节点时, 处理 Gateway Session 已关闭的事件
 func (n *Node) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
-	n.mu.Lock()
-	s, found := n.sessions[req.SessionId]
-	delete(n.sessions, req.SessionId)
-	n.mu.Unlock()
+	s, found := n.delSession(req.SessionId)
 	if found {
 		scheduler.PushTask(func() { session.Lifetime.Close(s) })
 	}
 	return &clusterpb.SessionClosedResponse{}, nil
 }
 
-// CloseSession implements the MemberServer interface
+// CloseSession 作为 Gateway 时, 处理业务节点关闭 Session 的请求
 func (n *Node) CloseSession(_ context.Context, req *clusterpb.CloseSessionRequest) (*clusterpb.CloseSessionResponse, error) {
-	n.mu.Lock()
-	s, found := n.sessions[req.SessionId]
-	delete(n.sessions, req.SessionId)
-	n.mu.Unlock()
+	s, found := n.delSession(req.SessionId)
 	if found {
 		s.Close()
 	}
 	return &clusterpb.CloseSessionResponse{}, nil
 }
 
-// ticker send heartbeat register info to master
+// findSession 查找 Session, 如果不存在则返回 nil, false
+func (n *Node) findSession(sid int64) (*session.Session, bool) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	s, found := n.sessions[sid]
+	return s, found
+}
+
+// delSession 删除 Session, 如果删除前存在则返回 Session 和 true, 否则返回 nil 和 false
+func (n *Node) delSession(sid int64) (*session.Session, bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	s, found := n.sessions[sid]
+	delete(n.sessions, sid)
+	return s, found
+}
+
+// saveSession 保存 Session, 如果存在则覆盖
+func (n *Node) saveSession(sid int64, s *session.Session) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.sessions[sid] = s
+}
+
+// keepalive 作为 Gateway 或 业务节点, 启动定时发送心跳协程
 func (n *Node) keepalive() {
 	if n.keepaliveExit == nil {
 		n.keepaliveExit = make(chan struct{})
@@ -471,6 +476,7 @@ func (n *Node) keepalive() {
 	}()
 }
 
+// heartbeat 作为 Gateway 或 业务节点, 向 Master 发送一次心跳请求
 func (n *Node) heartbeat() {
 	pool, err := n.rpcClient.getConnPool(n.AdvertiseAddr)
 	if err != nil {
@@ -478,13 +484,14 @@ func (n *Node) heartbeat() {
 		return
 	}
 	masterCli := clusterpb.NewMasterClient(pool.Get())
-	if _, err := masterCli.Heartbeat(context.Background(), &clusterpb.HeartbeatRequest{
+	request := clusterpb.HeartbeatRequest{
 		MemberInfo: &clusterpb.MemberInfo{
 			Label:       n.Label,
 			ServiceAddr: n.ServiceAddr,
 			Services:    n.handler.LocalService(),
 		},
-	}); err != nil {
-		log.Info("Member send heartbeat error", err)
+	}
+	if _, err = masterCli.Heartbeat(context.Background(), &request); err != nil {
+		log.Info("Member send heartbeat error.", err)
 	}
 }
