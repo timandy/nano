@@ -31,6 +31,7 @@ import (
 	"syscall"
 
 	"github.com/lonng/nano/cluster"
+	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/utils/assert"
@@ -118,6 +119,11 @@ func (engine *Engine) Trees() npi.HandlerTrees {
 // AllNoRoutes 获取无路由的处理程序
 func (engine *Engine) AllNoRoutes() npi.HandlersChain {
 	return engine.allNoRoute
+}
+
+// Register 注册组件
+func (engine *Engine) Register(component component.Component, options ...component.Option) {
+	engine.opts.Components.Register(component, options...)
 }
 
 // Startup 启动引擎
