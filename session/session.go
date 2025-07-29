@@ -67,7 +67,7 @@ func New(entity NetworkEntity) *Session {
 		lastTime: time.Now().Unix(),
 		router:   newRouter(),
 	}
-	Lifetime.FireCreated(s)
+	Event.FireSessionCreated(s)
 	return s
 }
 
@@ -88,7 +88,13 @@ func (s *Session) RPC(route string, v any) error {
 
 // Push 推送消息给客户端
 func (s *Session) Push(route string, v any) error {
-	return s.entity.Push(route, v)
+	err := s.entity.Push(route, v)
+	if err != nil {
+		Event.FireMessagePushFailed(s, route, v, err)
+		return err
+	}
+	Event.FireMessagePushed(s, route, v)
+	return err
 }
 
 // Response 响应消息给客户端
