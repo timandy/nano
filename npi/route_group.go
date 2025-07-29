@@ -24,14 +24,11 @@ type RouterGroup struct {
 }
 
 func NewRootGroup(engine Engine) RouterGroup {
-	return RouterGroup{engine: engine, root: true}
-}
-
-func NewRouterGroup(engine Engine, handlers ...HandlerFunc) *RouterGroup {
-	return &RouterGroup{
-		Handlers: handlers,
+	return RouterGroup{
+		Handlers: nil,
+		basePath: "",
 		engine:   engine,
-		root:     false,
+		root:     true,
 	}
 }
 
