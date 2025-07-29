@@ -1,26 +1,40 @@
 package session
 
-type (
-	// LifetimeHandler represents a callback
-	// that will be called when a session close or
-	// session low-level connection broken.
-	LifetimeHandler func(*Session)
-
-	lifetime struct {
-		// callbacks that emitted on session closed
-		onClosed []LifetimeHandler
-	}
-)
-
 var Lifetime = &lifetime{}
 
-// OnClosed set the Callback which will be called
-// when session is closed Waring: session has closed.
-func (lt *lifetime) OnClosed(h LifetimeHandler) {
-	lt.onClosed = append(lt.onClosed, h)
+// LifetimeHandler 表示回调
+type LifetimeHandler func(*Session)
+
+type lifetime struct {
+	// callbacks that emitted on session closed
+	onCreated []LifetimeHandler
+	// callbacks that emitted on session closed
+	onClosed []LifetimeHandler
 }
 
-func (lt *lifetime) Close(s *Session) {
+// SessionCreated 设置会话创建事件的回调
+func (lt *lifetime) SessionCreated(handler LifetimeHandler) {
+	lt.onCreated = append(lt.onCreated, handler)
+}
+
+// FireCreated 触发会话创建事件
+func (lt *lifetime) FireCreated(s *Session) {
+	if len(lt.onCreated) == 0 {
+		return
+	}
+
+	for _, h := range lt.onCreated {
+		h(s)
+	}
+}
+
+// SessionClosed 设置会话关闭事件的回调
+func (lt *lifetime) SessionClosed(handler LifetimeHandler) {
+	lt.onClosed = append(lt.onClosed, handler)
+}
+
+// FireClosed 触发会话关闭事件
+func (lt *lifetime) FireClosed(s *Session) {
 	if len(lt.onClosed) == 0 {
 		return
 	}

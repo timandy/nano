@@ -88,7 +88,7 @@ func NewRoomManager() *RoomManager {
 
 // AfterInit component lifetime callback
 func (mgr *RoomManager) AfterInit() {
-	session.Lifetime.OnClosed(func(s *session.Session) {
+	session.Lifetime.SessionClosed(func(s *session.Session) {
 		if !s.HasKey(roomIDKey) {
 			return
 		}

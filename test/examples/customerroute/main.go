@@ -161,7 +161,7 @@ func runChat(args *cli.Context) error {
 	log.Info("Remote master server address", masterAddr)
 
 	// Register session closed callback
-	session.Lifetime.OnClosed(tworoom.OnSessionClosed)
+	session.Lifetime.SessionClosed(tworoom.OnSessionClosed)
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(

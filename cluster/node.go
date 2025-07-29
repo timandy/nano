@@ -415,7 +415,7 @@ func (n *Node) DelMember(_ context.Context, req *clusterpb.DelMemberRequest) (*c
 func (n *Node) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
 	s, found := n.delSession(req.SessionId)
 	if found {
-		scheduler.PushTask(func() { session.Lifetime.Close(s) })
+		scheduler.PushTask(func() { session.Lifetime.FireClosed(s) })
 	}
 	return &clusterpb.SessionClosedResponse{}, nil
 }

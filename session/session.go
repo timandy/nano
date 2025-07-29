@@ -60,13 +60,15 @@ type Session struct {
 
 // New 返回新的会话实例 NetworkEntity 是低级网络实例
 func New(entity NetworkEntity) *Session {
-	return &Session{
+	s := &Session{
 		id:       service.Connections.SessionID(),
 		entity:   entity,
 		data:     make(map[string]any),
 		lastTime: time.Now().Unix(),
 		router:   newRouter(),
 	}
+	Lifetime.FireCreated(s)
+	return s
 }
 
 // NetworkEntity 返回低级网络代理对象

@@ -101,7 +101,7 @@ func runMaster(args *cli.Context) error {
 	}()
 
 	// Register session closed callback
-	session.Lifetime.OnClosed(master.OnSessionClosed)
+	session.Lifetime.SessionClosed(master.OnSessionClosed)
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
@@ -167,7 +167,7 @@ func runChat(args *cli.Context) error {
 	log.Info("Remote master server address", masterAddr)
 
 	// Register session closed callback
-	session.Lifetime.OnClosed(chat.OnSessionClosed)
+	session.Lifetime.SessionClosed(chat.OnSessionClosed)
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
