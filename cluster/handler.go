@@ -182,7 +182,7 @@ func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 		log.Info(err)
 		return
 	}
-	go h.handle(c)
+	h.handle(c) //使用 http 的协程, 以便共享 ThreadLocal
 }
 
 // handle 循环读取数据包, 一个连接开启一个单独的写线程
