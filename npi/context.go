@@ -39,6 +39,20 @@ func (c *Context) Reset() {
 	c.index = -1
 }
 
+// Copy 创建一个新的 Context 副本
+func (c *Context) Copy() *Context {
+	return &Context{
+		Mid:         c.Mid,
+		RoutePath:   c.RoutePath,
+		Service:     c.Service,
+		Msg:         c.Msg,
+		Session:     c.Session,
+		Errors:      c.Errors,
+		HandlerNode: nil,
+		index:       abortIndex,
+	}
+}
+
 // HandlerName 函数名
 func (c *Context) HandlerName() string {
 	return c.HandlerNode.Name()
