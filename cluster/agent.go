@@ -316,9 +316,9 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 	if err != nil {
 		switch data.typ {
 		case message.Push:
-			log.Info("Push: %s error.", data.route, err)
+			log.Error("Push: %s error.", data.route, err)
 		case message.Response:
-			log.Info("Response message(id: %d) error.", data.mid, err)
+			log.Error("Response message(id: %d) error.", data.mid, err)
 		default:
 			// expect
 		}
@@ -337,7 +337,7 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 	if pipe := a.pipeline; pipe != nil {
 		err = pipe.Outbound().Process(a.session, m)
 		if err != nil {
-			log.Info("broken pipeline", err)
+			log.Error("broken pipeline", err)
 			return nil
 		}
 	}
@@ -345,14 +345,14 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 	// 编码 Message
 	em, err := m.Encode()
 	if err != nil {
-		log.Info("Encode msg error.", err)
+		log.Error("Encode msg error.", err)
 		return nil
 	}
 
 	// 封包
 	p, err := packet.Encode(packet.Data, em)
 	if err != nil {
-		log.Info("Encode packet error.", err)
+		log.Error("Encode packet error.", err)
 		return nil
 	}
 	return p
@@ -361,7 +361,7 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 // writeData 将封好的包写入底层连接
 func (a *agent) writeData(data []byte) error {
 	if _, err := a.conn.Write(data); err != nil {
-		log.Info("Write data to low-level conn error.", err)
+		log.Error("Write data to low-level conn error.", err)
 		return err
 	}
 	return nil

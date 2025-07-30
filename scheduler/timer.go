@@ -93,7 +93,7 @@ func (t *Timer) Stop() {
 func safecall(id int64, fn TimerFunc) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Info("Timer Panic %v.", id, routine.NewRuntimeError(err))
+			log.Error("Timer Panic %v.", id, routine.NewRuntimeError(err))
 		}
 	}()
 

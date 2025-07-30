@@ -179,7 +179,7 @@ func (h *LocalHandler) RemoteService() []string {
 func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 	c, err := newWSConn(conn)
 	if err != nil {
-		log.Info(err)
+		log.Error("Read from websocket connection error.", err)
 		return
 	}
 	h.handle(c) //使用 http 的协程, 以便共享 ThreadLocal
@@ -209,13 +209,13 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			log.Info("Notify remote server", remote)
 			pool, err := h.node.rpcClient.getConnPool(remote)
 			if err != nil {
-				log.Info("Cannot retrieve connection pool for %s.", remote, err)
+				log.Error("Cannot retrieve connection pool for %s.", remote, err)
 				continue
 			}
 			client := clusterpb.NewWorkerClient(pool.Get())
 			_, err = client.SessionClosed(context.Background(), request)
 			if err != nil {
-				log.Info("Cannot closed session in remote address.", remote, err)
+				log.Error("Cannot closed session in remote address.", remote, err)
 				continue
 			}
 			if env.Debug {
@@ -234,19 +234,19 @@ func (h *LocalHandler) handle(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			log.Info("Read message error, session will be closed immediately.", err)
+			log.Error("Read message error, session will be closed immediately.", err)
 			return
 		}
 
 		// TODO(warning): decoder use slice for performance, packet data should be copy before next Decode
 		packets, err := agent.decoder.Decode(buf[:n])
 		if err != nil {
-			log.Info("Decode packet error.", err)
+			log.Error("Decode packet error.", err)
 
 			// 处理已经解码的包并返回
 			for _, p := range packets {
 				if err := h.processPacket(agent, p); err != nil {
-					log.Info("Process packet error.", err)
+					log.Error("Process packet error.", err)
 					return
 				}
 			}
@@ -256,7 +256,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 		// 处理所有包
 		for _, p := range packets {
 			if err := h.processPacket(agent, p); err != nil {
-				log.Info("Process packet error.", err)
+				log.Error("Process packet error.", err)
 				return
 			}
 		}
@@ -370,7 +370,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 	}
 	pool, err := h.node.rpcClient.getConnPool(remoteAddr)
 	if err != nil {
-		log.Info("Get client conn pool error.", err)
+		log.Error("Get client conn pool error.", err)
 		return
 	}
 	var data = msg.Data
@@ -409,7 +409,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 		_, err = client.HandleNotify(context.Background(), request)
 	}
 	if err != nil {
-		log.Info("Process remote message (%d:%s) error.", msg.ID, msg.Route, err)
+		log.Error("Process remote message (%d:%s) error.", msg.ID, msg.Route, err)
 	}
 }
 
@@ -418,7 +418,7 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 	if pipe := h.pipeline; pipe != nil {
 		err := pipe.Inbound().Process(session, msg)
 		if err != nil {
-			log.Info("Pipeline process failed.", err)
+			log.Error("Pipeline process failed.", err)
 			return
 		}
 	}

@@ -55,7 +55,7 @@ func (n *Node) Shutdown() {
 	}
 	pool, err := n.rpcClient.getConnPool(n.opts.AdvertiseAddr)
 	if err != nil {
-		log.Info("Retrieve master address error.", err)
+		log.Error("Retrieve master address error.", err)
 		return
 	}
 	client := clusterpb.NewMasterClient(pool.Get())
@@ -64,7 +64,7 @@ func (n *Node) Shutdown() {
 	}
 	_, err = client.Unregister(context.Background(), request)
 	if err != nil {
-		log.Info("Unregister current node failed", err)
+		log.Error("Unregister current node failed", err)
 	}
 }
 

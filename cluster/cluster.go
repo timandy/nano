@@ -252,7 +252,7 @@ func (c *cluster) checkHeartbeat() {
 			ServiceAddr: m.MemberInfo().ServiceAddr,
 		}
 		if _, err := c.Unregister(context.Background(), req); err != nil {
-			log.Info("Heartbeat unregister error.", err)
+			log.Error("Heartbeat unregister error.", err)
 		}
 	}
 }

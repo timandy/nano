@@ -164,14 +164,14 @@ func (h *Handler) Call(c *npi.Context) {
 	args, err := h.ResolveArgs(c)
 	if err != nil {
 		c.Error(err)
-		log.Info("handler call resolve args error.", err)
+		log.Error("Handler call resolve args error.", err)
 		return
 	}
 	retValues := h.handlerValue.Call(args)
 	response, err := h.ResolveReturnValues(retValues)
 	if err != nil {
 		c.Error(err)
-		log.Info("handler call resolve return values error.", err)
+		log.Error("Handler call resolve return values error.", err)
 		return
 	}
 	if response == nil {
@@ -180,7 +180,7 @@ func (h *Handler) Call(c *npi.Context) {
 	err = c.Response(response)
 	if err != nil {
 		c.Error(err)
-		log.Info("handler call response error.", err)
+		log.Error("Handler call response error.", err)
 	}
 }
 

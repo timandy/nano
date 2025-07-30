@@ -217,7 +217,7 @@ func (c *Connector) write() {
 		select {
 		case data := <-c.chSend:
 			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Info(err.Error())
+				log.Error(err.Error())
 				c.Close()
 			}
 
@@ -235,14 +235,14 @@ func (c *Connector) read() {
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Info(err.Error())
+			log.Error(err.Error())
 			c.Close()
 			return
 		}
 
 		packets, err := c.codec.Decode(buf)
 		if err != nil {
-			log.Info(err.Error())
+			log.Error(err.Error())
 			c.Close()
 			return
 		}
@@ -262,7 +262,7 @@ func (c *Connector) processPacket(p *packet.Packet) {
 	case packet.Data:
 		msg, err := message.Decode(p.Data)
 		if err != nil {
-			log.Info(err.Error())
+			log.Error(err.Error())
 			return
 		}
 		c.processMessage(msg)

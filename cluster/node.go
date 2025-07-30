@@ -193,7 +193,7 @@ func (n *Node) initMember() {
 			n.cluster.initMembers(resp.Members)
 			break
 		}
-		log.Info("Register current node to cluster failed, and will retry in %v.", env.RetryInterval.String(), err)
+		log.Error("Register current node to cluster failed, and will retry in %v.", env.RetryInterval.String(), err)
 		time.Sleep(env.RetryInterval)
 	}
 
@@ -227,7 +227,7 @@ func (n *Node) Handler() *LocalHandler {
 func (n *Node) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := n.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Info("Upgrade failure, URI=%s", r.RequestURI, err)
+		log.Error("Upgrade failure, URI=%s", r.RequestURI, err)
 		return
 	}
 	n.handler.handleWS(conn)
@@ -308,7 +308,7 @@ func (n *Node) startHeartbeatTimer() {
 func (n *Node) heartbeat() {
 	pool, err := n.rpcClient.getConnPool(n.opts.AdvertiseAddr)
 	if err != nil {
-		log.Info("rpcClient master conn", err)
+		log.Error("Get master conn pool error.", err)
 		return
 	}
 	masterCli := clusterpb.NewMasterClient(pool.Get())
@@ -320,6 +320,6 @@ func (n *Node) heartbeat() {
 		},
 	}
 	if _, err = masterCli.Heartbeat(context.Background(), &request); err != nil {
-		log.Info("Member send heartbeat error.", err)
+		log.Error("Member send heartbeat error.", err)
 	}
 }

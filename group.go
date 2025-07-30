@@ -120,7 +120,7 @@ func (c *Group) Multicast(route string, v any, filter SessionFilter) error {
 			continue
 		}
 		if err = s.Push(route, data); err != nil {
-			log.Info(err.Error())
+			log.Error("Push message error.", err)
 		}
 	}
 
@@ -147,7 +147,7 @@ func (c *Group) Broadcast(route string, v any) error {
 
 	for _, s := range c.sessions {
 		if err = s.Push(route, data); err != nil {
-			log.Info("Session push message error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
+			log.Error("Session push message error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
 		}
 	}
 

@@ -35,7 +35,7 @@ func (rs *ChatRoomService) SyncMessage(s *session.Session, msg *SyncMessage) err
 
 func (rs *ChatRoomService) userDisconnected(s *session.Session) {
 	if err := rs.group.Leave(s); err != nil {
-		log.Info("Remove user from group failed", s.UID(), err)
+		log.Error("Remove user from group failed", s.UID(), err)
 		return
 	}
 	log.Info("User session disconnected", s.UID())

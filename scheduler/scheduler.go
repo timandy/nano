@@ -49,7 +49,7 @@ var (
 func try(f func()) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Info("Handle message panic.", routine.NewRuntimeError(err))
+			log.Error("Handle message panic.", routine.NewRuntimeError(err))
 		}
 	}()
 	f()

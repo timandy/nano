@@ -19,11 +19,11 @@ func SetRouteDict(dict map[string]uint16) {
 
 		// duplication check
 		if _, ok := routes[r]; ok {
-			log.Info("duplicated route(route: %s, code: %d)", r, code)
+			log.Error("duplicated route(route: %s, code: %d)", r, code)
 		}
 
 		if _, ok := codes[code]; ok {
-			log.Info("duplicated route(route: %s, code: %d)", r, code)
+			log.Error("duplicated route(route: %s, code: %d)", r, code)
 		}
 
 		// update map, using last value when key duplicated
