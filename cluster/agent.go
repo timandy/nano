@@ -232,11 +232,16 @@ func (a *agent) write() {
 	heartbeat := env.HeartbeatInterval
 	ticker := time.NewTicker(heartbeat)
 	chWrite := make(chan []byte, agentWriteBacklog)
+	forceQuit := false
 	// clean func
 	defer func() {
 		ticker.Stop()
 		close(a.chSend)
 		close(chWrite)
+		//非强制退出, 则将所有待发送的消息写入底层连接
+		if !forceQuit {
+			a.flush(chWrite)
+		}
 		a.Close()
 		if env.Debug {
 			log.Info("Session write goroutine exit, SessionID=%d, UID=%d", a.session.ID(), a.session.UID())
@@ -245,6 +250,7 @@ func (a *agent) write() {
 
 	for {
 		select {
+		// 心跳检测
 		case <-ticker.C:
 			deadline := time.Now().Add(-2 * heartbeat).Unix()
 			if atomic.LoadInt64(&a.lastAt) < deadline {
@@ -253,61 +259,110 @@ func (a *agent) write() {
 			}
 			chWrite <- getHbd()
 
+		// 封包任务
+		case msg := <-a.chSend:
+			data := a.packMsg(msg)
+			if len(data) == 0 {
+				break
+			}
+			chWrite <- data
+
+		// 发送任务
 		case data := <-chWrite:
 			// close agent while low-level conn broken
-			if _, err := a.conn.Write(data); err != nil {
-				log.Info(err.Error())
+			err := a.writeData(data)
+			if err != nil {
 				return
 			}
 
-		case data := <-a.chSend:
-			payload, err := env.Marshal(data.payload)
-			if err != nil {
-				switch data.typ {
-				case message.Push:
-					log.Info("Push: %s error.", data.route, err)
-				case message.Response:
-					log.Info("Response message(id: %d) error.", data.mid, err)
-				default:
-					// expect
-				}
-				break
-			}
-
-			// construct message and encode
-			m := &message.Message{
-				Type:  data.typ,
-				Data:  payload,
-				Route: data.route,
-				ID:    data.mid,
-			}
-			if pipe := a.pipeline; pipe != nil {
-				err := pipe.Outbound().Process(a.session, m)
-				if err != nil {
-					log.Info("broken pipeline", err)
-					break
-				}
-			}
-
-			em, err := m.Encode()
-			if err != nil {
-				log.Info("Encode msg error.", err)
-				break
-			}
-
-			// packet encode
-			p, err := packet.Encode(packet.Data, em)
-			if err != nil {
-				log.Info("Encode packet error.", err)
-				break
-			}
-			chWrite <- p
-
+		// 会话关闭
 		case <-a.chDie: // agent closed signal
 			return
 
+		// 引擎退出
 		case <-env.DieChan: // application quit
+			forceQuit = true
 			return
 		}
 	}
+}
+
+// 关闭连接之前, 将所有待发送的消息写入底层连接
+func (a *agent) flush(chWrite <-chan []byte) {
+	// 处理写入任务
+	for data := range chWrite {
+		err := a.writeData(data)
+		if err != nil {
+			return // 底层连接断开, 退出写入
+		}
+	}
+	// 处理封包和写入任务
+	for msg := range a.chSend {
+		data := a.packMsg(msg)
+		if len(data) == 0 {
+			continue // 忽略封包失败错误
+		}
+		err := a.writeData(data)
+		if err != nil {
+			return // 底层连接断开, 退出写入
+		}
+	}
+}
+
+// packMsg 封包
+func (a *agent) packMsg(data pendingMessage) []byte {
+	// 序列化
+	payload, err := env.Marshal(data.payload)
+	if err != nil {
+		switch data.typ {
+		case message.Push:
+			log.Info("Push: %s error.", data.route, err)
+		case message.Response:
+			log.Info("Response message(id: %d) error.", data.mid, err)
+		default:
+			// expect
+		}
+		return nil
+	}
+
+	// 构建 Message
+	m := &message.Message{
+		Type:  data.typ,
+		Data:  payload,
+		Route: data.route,
+		ID:    data.mid,
+	}
+
+	// 执行 pipeline
+	if pipe := a.pipeline; pipe != nil {
+		err = pipe.Outbound().Process(a.session, m)
+		if err != nil {
+			log.Info("broken pipeline", err)
+			return nil
+		}
+	}
+
+	// 编码 Message
+	em, err := m.Encode()
+	if err != nil {
+		log.Info("Encode msg error.", err)
+		return nil
+	}
+
+	// 封包
+	p, err := packet.Encode(packet.Data, em)
+	if err != nil {
+		log.Info("Encode packet error.", err)
+		return nil
+	}
+	return p
+}
+
+// writeData 将封好的包写入底层连接
+func (a *agent) writeData(data []byte) error {
+	if _, err := a.conn.Write(data); err != nil {
+		log.Info("Write data to low-level conn error.", err)
+		return err
+	}
+	return nil
 }
