@@ -42,5 +42,6 @@ func SetLogger(logger Logger) {
 		return
 	}
 	Info = logger.Info
+	Error = logger.Error
 	Fatal = logger.Fatal
 }
