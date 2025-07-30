@@ -18,7 +18,7 @@ func (n *Node) ListenAndServe(addr string) error {
 	log.Info("==========【Nano is starting %v】==========", addr)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Error("==========【Nano failed to start, %v】==========", err)
+		log.Error("==========【Nano failed to start, %v】==========", err.Error())
 		return err
 	}
 	//goland:noinspection GoUnhandledErrorResult
@@ -61,7 +61,7 @@ func (n *Node) ListenAndServeWs(addr string, path string) error {
 	log.Info("==========【Nano is starting %v】==========", addr)
 	ln, err := server.Listen()
 	if err != nil {
-		log.Error("==========【Nano failed to start, %v】==========", err)
+		log.Error("==========【Nano failed to start, %v】==========", err.Error())
 		return err
 	}
 	//goland:noinspection GoUnhandledErrorResult

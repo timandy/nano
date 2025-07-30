@@ -215,7 +215,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			client := clusterpb.NewWorkerClient(pool.Get())
 			_, err = client.SessionClosed(context.Background(), request)
 			if err != nil {
-				log.Error("Cannot closed session in remote address.", remote, err)
+				log.Error("Cannot closed session in remote address %v.", remote, err)
 				continue
 			}
 			if env.Debug {
