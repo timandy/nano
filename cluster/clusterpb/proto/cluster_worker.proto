@@ -1,0 +1,32 @@
+syntax = "proto3";
+package clusterpb;
+option go_package = "/clusterpb";
+
+message RequestMessage {
+  string gateAddr = 1;
+  int64 sessionId = 2;
+  uint64 id = 3;
+  string route = 4;
+  bytes data = 5;
+}
+
+message NotifyMessage {
+  string gateAddr = 1;
+  int64 sessionId = 2;
+  string route = 3;
+  bytes data = 4;
+}
+
+message MemberHandleResponse {}
+
+message SessionClosedRequest {
+  int64 sessionId = 1;
+}
+
+message SessionClosedResponse {}
+
+service Worker  {
+  rpc HandleRequest (RequestMessage) returns (MemberHandleResponse) {}
+  rpc HandleNotify (NotifyMessage) returns (MemberHandleResponse) {}
+  rpc SessionClosed(SessionClosedRequest) returns(SessionClosedResponse) {}
+}

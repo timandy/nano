@@ -57,11 +57,10 @@ func server() {
 	components.Register(NewTestHandler())
 
 	e := nano.New(nano.WithDebugMode(),
-		nano.WithTcpAddr(addr),
 		nano.WithSerializer(protobuf.NewSerializer()),
 		nano.WithComponents(components),
 	)
-	e.Run()
+	_ = e.RunTcp(addr)
 }
 
 func client() {

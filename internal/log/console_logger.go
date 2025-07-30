@@ -17,6 +17,10 @@ func (c *ConsoleLogger) Info(args ...any) {
 	_ = (*log.Logger)(c).Output(2, FormatArgs(args...))
 }
 
+func (c *ConsoleLogger) Error(args ...any) {
+	_ = (*log.Logger)(c).Output(2, FormatArgs(args...))
+}
+
 func (c *ConsoleLogger) Fatal(args ...any) {
 	_ = (*log.Logger)(c).Output(2, FormatArgs(args...))
 	os.Exit(1)

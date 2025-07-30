@@ -1,0 +1,29 @@
+syntax = "proto3";
+package clusterpb;
+option go_package = "/clusterpb";
+
+message ResponseMessage {
+  int64 sessionId = 1;
+  uint64 id = 2;
+  bytes data = 3;
+}
+
+message PushMessage {
+  int64 sessionId = 1;
+  string route = 2;
+  bytes data = 3;
+}
+
+message GateHandleResponse {}
+
+message CloseSessionRequest {
+  int64 sessionId = 1;
+}
+
+message CloseSessionResponse {}
+
+service Gate{
+  rpc HandlePush (PushMessage) returns (GateHandleResponse) {}
+  rpc HandleResponse (ResponseMessage) returns (GateHandleResponse) {}
+  rpc CloseSession(CloseSessionRequest) returns(CloseSessionResponse) {}
+}

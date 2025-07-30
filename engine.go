@@ -22,7 +22,6 @@ package nano
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,8 +31,6 @@ import (
 
 	"github.com/lonng/nano/cluster"
 	"github.com/lonng/nano/component"
-	"github.com/lonng/nano/internal/env"
-	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/internal/utils/assert"
 	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/scheduler"
@@ -131,28 +128,13 @@ func (engine *Engine) Startup() error {
 	if !atomic.CompareAndSwapInt32(&engine.running, 0, 1) {
 		return errors.New("nano has running")
 	}
-
-	opts := engine.opts
-	// Use listen address as client address in non-cluster mode
-	if opts.SingleMode() {
-		log.Info("Nano runs in singleton mode")
-	}
-
-	engine.node = cluster.NewNode(engine, opts)
-	err := engine.node.Startup()
-	if err != nil {
-		return fmt.Errorf("nano node Startup failed: %v", err)
-	}
-	if opts.ServiceAddr != "" {
-		log.Info("Nano server started grpc at %s", opts.ServiceAddr)
-	}
+	engine.node = cluster.NewNode(engine, engine.opts)
 	go scheduler.Sched()
 	return nil
 }
 
 // Shutdown 发送信号并关闭 nano
 func (engine *Engine) Shutdown() {
-	env.Close()
 	if engine.node != nil {
 		engine.node.Shutdown()
 	}
@@ -160,18 +142,25 @@ func (engine *Engine) Shutdown() {
 	atomic.StoreInt32(&engine.running, 0)
 }
 
-// Listen 启动 WebSocket 服务
-func (engine *Engine) Listen(addr string, path string) error {
+// RunTcp 启动 TCP 服务
+func (engine *Engine) RunTcp(addr string) error {
 	err := engine.Startup()
 	if err != nil {
 		return err
 	}
-	mux := http.NewServeMux()
-	mux.Handle(path, engine)
-	return http.ListenAndServe(addr, mux)
+	return engine.node.ListenAndServe(addr)
 }
 
-// Run 启动 grpc 服务 和 TCP 服务(指定了 TcpAddr), 并等待退出信号
+// RunWs 启动 WebSocket 服务
+func (engine *Engine) RunWs(addr string, path string) error {
+	err := engine.Startup()
+	if err != nil {
+		return err
+	}
+	return engine.node.ListenAndServeWs(addr, path)
+}
+
+// Run 启动 grpc 服务, 并等待退出信号
 func (engine *Engine) Run() error {
 	err := engine.Startup()
 	if err != nil {
@@ -186,11 +175,7 @@ func (engine *Engine) Wait() {
 	sg := make(chan os.Signal)
 	signal.Notify(sg, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
 	select {
-	case <-env.DieChan:
-		log.Info("Nano server will shutdown in a few seconds")
-	case s := <-sg:
-		log.Info("Nano server got signal", s)
+	case <-sg:
 	}
-	log.Info("Nano server is stopping...")
 	engine.Shutdown()
 }

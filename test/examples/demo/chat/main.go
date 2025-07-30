@@ -170,5 +170,5 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/nano", e)
 	mux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir(webDir))))
-	http.ListenAndServe(":3250", mux)
+	_ = http.ListenAndServe(":3250", mux)
 }

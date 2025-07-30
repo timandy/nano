@@ -101,17 +101,10 @@ func WithRouteDict(dict map[string]uint16) Option {
 
 //==== 集群
 
-// WithMaster 设置当前为 master 节点
-func WithMaster() Option {
+// WithNodeType 设置节点类型
+func WithNodeType(nodeType cluster.NodeType) Option {
 	return func(opt *cluster.Options) {
-		opt.IsMaster = true
-	}
-}
-
-// WithTcpAddr 监听 tcp 协议的时候需要配置, 一般只配置Prot 例如 :Port
-func WithTcpAddr(addr string) Option {
-	return func(opt *cluster.Options) {
-		opt.TcpAddr = addr
+		opt.NodeType = nodeType
 	}
 }
 

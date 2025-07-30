@@ -56,24 +56,21 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	masterComps := &component.Components{}
 	masterComps.Register(&MasterComponent{})
 	masterOpts := cluster.DefaultOptions()
-	masterOpts.IsMaster = true
+	masterOpts.NodeType = cluster.NodeTypeMaster | cluster.NodeTypeWorker
 	masterOpts.Components = masterComps
 	masterOpts.ServiceAddr = "127.0.0.1:4450"
 	masterNode := cluster.NewNode(nil, masterOpts)
-	err := masterNode.Startup()
-	c.Assert(err, IsNil)
 	masterHandler := masterNode.Handler()
 	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
 	//网关
-	member1Comps := &component.Components{}
-	member1Comps.Register(&GateComponent{})
-	member1Opts := cluster.DefaultOptions()
-	member1Opts.AdvertiseAddr = "127.0.0.1:4450"
-	member1Opts.ServiceAddr = "127.0.0.1:14451"
-	member1Opts.Components = member1Comps
-	memberNode1 := cluster.NewNode(nil, member1Opts)
-	err = memberNode1.Startup()
-	c.Assert(err, IsNil)
+	memberGate := &component.Components{}
+	memberGate.Register(&GateComponent{})
+	gateOpts := cluster.DefaultOptions()
+	gateOpts.NodeType = cluster.NodeTypeGate
+	gateOpts.AdvertiseAddr = "127.0.0.1:4450"
+	gateOpts.ServiceAddr = "127.0.0.1:14451"
+	gateOpts.Components = memberGate
+	memberNode1 := cluster.NewNode(nil, gateOpts)
 	member1Handler := memberNode1.Handler()
 	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
 	c.Assert(masterHandler.RemoteService(), DeepEquals, []string{"GateComponent"})
@@ -84,15 +81,14 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	mux1.Handle("/ws", memberNode1)
 	go http.ListenAndServe(":14452", mux1)
 	//游戏
-	member2Comps := &component.Components{}
-	member2Comps.Register(&GameComponent{})
-	member2Opts := cluster.DefaultOptions()
-	member2Opts.AdvertiseAddr = "127.0.0.1:4450"
-	member2Opts.ServiceAddr = "127.0.0.1:24451"
-	member2Opts.Components = member2Comps
-	memberNode2 := cluster.NewNode(nil, member2Opts)
-	err = memberNode2.Startup()
-	c.Assert(err, IsNil)
+	memberWorker := &component.Components{}
+	memberWorker.Register(&GameComponent{})
+	workerOpts := cluster.DefaultOptions()
+	workerOpts.NodeType = cluster.NodeTypeWorker
+	workerOpts.AdvertiseAddr = "127.0.0.1:4450"
+	workerOpts.ServiceAddr = "127.0.0.1:24451"
+	workerOpts.Components = memberWorker
+	memberNode2 := cluster.NewNode(nil, workerOpts)
 	member2Handler := memberNode2.Handler()
 	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
 	c.Assert(masterHandler.RemoteService(), DeepEquals, []string{"GameComponent", "GateComponent"})
@@ -118,7 +114,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	connector.On("test", func(data any) {
 		onResult <- string(data.([]byte))
 	})
-	err = connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
+	err := connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
 	c.Assert(err, IsNil)
 	c.Assert(strings.Contains(<-onResult, "gate server pong"), IsTrue)
 

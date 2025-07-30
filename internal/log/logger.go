@@ -22,6 +22,7 @@ package log
 
 type Logger interface {
 	Info(args ...any)
+	Error(args ...any)
 	Fatal(args ...any)
 }
 
@@ -31,6 +32,7 @@ func init() {
 
 var (
 	Info  func(args ...any)
+	Error func(args ...any)
 	Fatal func(args ...any)
 )
 

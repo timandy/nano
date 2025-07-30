@@ -1,0 +1,32 @@
+syntax = "proto3";
+package clusterpb;
+option go_package = "/clusterpb";
+
+import "cluster_base.proto";
+
+message RegisterRequest {
+  MemberInfo memberInfo = 1;
+}
+
+message RegisterResponse {
+  repeated MemberInfo members = 1;
+}
+
+message UnregisterRequest {
+  string serviceAddr = 1;
+}
+
+message UnregisterResponse {}
+
+message HeartbeatRequest {
+  MemberInfo memberInfo = 1;
+}
+
+message HeartbeatResponse {
+}
+
+service Master {
+  rpc Register (RegisterRequest) returns (RegisterResponse) {}
+  rpc Unregister (UnregisterRequest) returns (UnregisterResponse) {}
+  rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse) {}
+}

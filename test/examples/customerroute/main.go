@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/lonng/nano/cluster"
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/protocal/serialize/json"
@@ -103,7 +104,7 @@ func runMaster(args *cli.Context) error {
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
-		nano.WithMaster(),
+		nano.WithNodeType(cluster.NodeTypeMaster),
 		nano.WithServiceAddr(listen),
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithDebugMode(),
@@ -133,6 +134,7 @@ func runGate(args *cli.Context) error {
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
+		nano.WithNodeType(cluster.NodeTypeGate),
 		nano.WithAdvertiseAddr(masterAddr),
 		nano.WithServiceAddr(listen),
 		nano.WithComponents(onegate.Services),
@@ -143,7 +145,7 @@ func runGate(args *cli.Context) error {
 		nano.WithRemoteServiceRoute(customerRemoteServiceRoute),
 		nano.WithNodeId(2), // if you deploy multi gate, option set nodeId, default nodeId = os.Getpid()
 	)
-	return engine.Listen(gateAddr, "/nano")
+	return engine.RunWs(gateAddr, "/nano")
 }
 
 func runChat(args *cli.Context) error {
@@ -153,7 +155,7 @@ func runChat(args *cli.Context) error {
 	}
 
 	masterAddr := args.String("master")
-	if listen == "" {
+	if masterAddr == "" {
 		return errors.Errorf("master address cannot empty")
 	}
 
@@ -165,6 +167,7 @@ func runChat(args *cli.Context) error {
 
 	// Startup Nano server with the specified listen address
 	engine := nano.New(
+		nano.WithNodeType(cluster.NodeTypeWorker),
 		nano.WithAdvertiseAddr(masterAddr),
 		nano.WithServiceAddr(listen),
 		nano.WithComponents(tworoom.Services),

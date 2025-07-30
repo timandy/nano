@@ -4,7 +4,6 @@
 package ws
 
 import (
-	"net/http"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -61,14 +60,7 @@ func server() {
 		nano.WithSerializer(protobuf.NewSerializer()),
 		nano.WithComponents(components),
 	)
-	err := e.Startup()
-	if err != nil {
-		return
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/ws", e)
-	http.ListenAndServe(addr, mux)
+	_ = e.RunWs(addr, "/ws")
 }
 
 func client() {

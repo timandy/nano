@@ -59,21 +59,21 @@ type LocalHandler struct {
 	mu             sync.RWMutex
 	remoteServices map[string][]*clusterpb.MemberInfo
 
-	currentNode *Node
-	pipeline    pipeline.Pipeline
-	opts        *Options
+	node     *Node
+	pipeline pipeline.Pipeline
+	opts     *Options
 }
 
-func newHandler(currentNode *Node) *LocalHandler {
-	engine := currentNode.engine
+func newHandler(node *Node) *LocalHandler {
+	engine := node.engine
 	return &LocalHandler{
 		localServices:  make(map[string]*component.Service),
 		localHandlers:  getTrees(engine),
 		allNoRoutes:    getAllNoRoutes(engine),
 		remoteServices: map[string][]*clusterpb.MemberInfo{},
-		currentNode:    currentNode,
-		pipeline:       currentNode.Pipeline,
-		opts:           currentNode.Options,
+		node:           node,
+		pipeline:       node.opts.Pipeline,
+		opts:           node.opts,
 	}
 }
 
@@ -189,7 +189,7 @@ func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 func (h *LocalHandler) handle(conn net.Conn) {
 	// create a client agent and startup write gorontine
 	agent := newAgent(conn, h.pipeline, h.remoteProcess)
-	h.currentNode.storeSession(agent.session)
+	h.node.storeSession(agent.session)
 
 	// startup write goroutine
 	go agent.write()
@@ -204,15 +204,15 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			SessionId: agent.session.ID(),
 		}
 
-		members := h.currentNode.cluster.remoteAddrs()
+		members := h.node.cluster.remoteAddrs()
 		for _, remote := range members {
 			log.Info("Notify remote server", remote)
-			pool, err := h.currentNode.rpcClient.getConnPool(remote)
+			pool, err := h.node.rpcClient.getConnPool(remote)
 			if err != nil {
 				log.Info("Cannot retrieve connection pool for %s.", remote, err)
 				continue
 			}
-			client := clusterpb.NewMemberClient(pool.Get())
+			client := clusterpb.NewWorkerClient(pool.Get())
 			_, err = client.SessionClosed(context.Background(), request)
 			if err != nil {
 				log.Info("Cannot closed session in remote address.", remote, err)
@@ -348,11 +348,11 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 	// 2. Use the service address directly if the router contains binding item
 	// 3. Select a remote service address randomly and bind to router
 	var remoteAddr string
-	if h.currentNode.Options.RemoteServiceRoute != nil {
+	if h.node.opts.RemoteServiceRoute != nil {
 		if addr, found := session.Router().Find(service); found {
 			remoteAddr = addr
 		} else {
-			member := h.currentNode.Options.RemoteServiceRoute(service, session, members)
+			member := h.node.opts.RemoteServiceRoute(service, session, members)
 			if member == nil {
 				log.Info("customize remoteServiceRoute handler: %s is not found", msg.Route)
 				return
@@ -368,7 +368,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 			session.Router().Bind(service, remoteAddr)
 		}
 	}
-	pool, err := h.currentNode.rpcClient.getConnPool(remoteAddr)
+	pool, err := h.node.rpcClient.getConnPool(remoteAddr)
 	if err != nil {
 		log.Info("Get client conn pool error.", err)
 		return
@@ -380,7 +380,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 	}
 
 	// Retrieve gate address and session id
-	gateAddr := h.currentNode.ServiceAddr
+	gateAddr := h.node.opts.ServiceAddr
 	sessionId := session.ID()
 	switch v := session.NetworkEntity().(type) {
 	case *acceptor:
@@ -388,7 +388,7 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 		sessionId = v.sid
 	}
 
-	client := clusterpb.NewMemberClient(pool.Get())
+	client := clusterpb.NewWorkerClient(pool.Get())
 	switch msg.Type {
 	case message.Request:
 		request := &clusterpb.RequestMessage{
@@ -442,7 +442,7 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 			v.lastMid = lastMid
 		}
 		//获取 Context
-		pool := &h.currentNode.pool
+		pool := &h.node.pool
 		c := pool.Get().(*npi.Context)
 		defer pool.Put(c)
 		c.Reset()

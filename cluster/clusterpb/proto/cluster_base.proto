@@ -1,0 +1,9 @@
+syntax = "proto3";
+package clusterpb;
+option go_package = "/clusterpb";
+
+message MemberInfo {
+  string label = 1;
+  string serviceAddr = 2;
+  repeated string services = 3;
+}
