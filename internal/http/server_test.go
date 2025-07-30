@@ -8,16 +8,16 @@ import (
 )
 
 func TestShuttingDownErr(t *testing.T) {
-	s := &Server{}
+	s := &Server{Addr: ":18081"}
 	err := s.Shutdown(context.Background())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_, err = s.Listen()
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestShuttingDownOK(t *testing.T) {
-	s := &Server{}
+	s := &Server{Addr: ":18081"}
 	l, err := s.Listen()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_ = l.Close()
 }
