@@ -47,6 +47,12 @@ var (
 	}
 )
 
+// 初始化对外暴漏的函数
+func init() {
+	serialize.Marshal = Marshal
+	serialize.Unmarshal = Unmarshal
+}
+
 // Marshal 序列化数据
 func Marshal(v any) ([]byte, error) {
 	switch raw := v.(type) {

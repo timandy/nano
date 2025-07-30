@@ -20,6 +20,12 @@
 
 package serialize
 
+// 对外公开序列化函数, 内部不要使用
+var (
+	Marshal   func(any) ([]byte, error)
+	Unmarshal func([]byte, any) error
+)
+
 type (
 	// Marshaler represents a marshal interface
 	Marshaler interface {
