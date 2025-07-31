@@ -8,6 +8,7 @@ import (
 
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/component"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/protocal/serialize/json"
 	"github.com/lonng/nano/test/examples/demo/tadpole/logic"
 	"github.com/urfave/cli/v2"
@@ -59,6 +60,7 @@ func serve(ctx *cli.Context) error {
 		return err
 	}
 
+	log.Info("Open http://127.0.0.1:23456/static/ in browser")
 	webDir := filepath.Join(srcPath(), "static")
 	mux := http.NewServeMux()
 	mux.Handle("/", e)

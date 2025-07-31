@@ -10,6 +10,7 @@ import (
 
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/component"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/protocal/serialize/json"
 	"github.com/lonng/nano/scheduler"
@@ -166,6 +167,7 @@ func main() {
 		return
 	}
 
+	log.Info("Open http://localhost:3250/web/ in browser")
 	webDir := filepath.Join(srcPath(), "web")
 	mux := http.NewServeMux()
 	mux.Handle("/nano", e)
