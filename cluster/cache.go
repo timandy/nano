@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"encoding/json"
-	"math"
 	"strconv"
 	"time"
 
@@ -13,59 +12,65 @@ import (
 
 // 缓存的数据
 var (
-	hsd            []byte // 握手响应数据, 时间戳需要动态替换
-	hbd            []byte // 心跳数据包数据
-	hsdPlaceholder = []byte(strconv.FormatInt(math.MaxInt64, 10))
+	hsd []byte // 握手响应数据, 时间戳需要动态替换
+	hbd []byte // 心跳数据包数据
+)
+
+// 占位符, 握手响应数据包中时间戳的占位符
+var (
+	hsdTimePlaceHolder    = "${Time}"
+	hsdTimePlaceHolderKey = []byte("\"" + hsdTimePlaceHolder + "\"")
 )
 
 // 执行缓存
 func cache() {
-	hrdata := map[string]any{
-		"code": 200,
-		"sys": map[string]any{
-			"heartbeat":  env.HeartbeatInterval.Seconds(),
-			"servertime": math.MaxInt64, //占位符
-		},
-	}
+	// 握手数据 map
+	var hsdmap map[string]any
 	if dict, ok := message.GetRouteDict(); ok {
-		hrdata = map[string]any{
+		hsdmap = map[string]any{
 			"code": 200,
 			"sys": map[string]any{
 				"heartbeat":  env.HeartbeatInterval.Seconds(),
-				"servertime": math.MaxInt64, //占位符
+				"servertime": hsdTimePlaceHolder, //占位符
 				"dict":       dict,
 			},
 		}
+	} else {
+		hsdmap = map[string]any{
+			"code": 200,
+			"sys": map[string]any{
+				"heartbeat":  env.HeartbeatInterval.Seconds(),
+				"servertime": hsdTimePlaceHolder, //占位符
+			},
+		}
 	}
-	// data, err := json.Marshal(map[string]any{
-	// 	"code": 200,
-	// 	"sys": map[string]float64{
-	// 		"heartbeat": env.Heartbeat.Seconds(),
-	// 	},
-	// })
-	data, err := json.Marshal(hrdata)
+
+	//握手数据包内容, json
+	hsdata, err := json.Marshal(hsdmap)
 	if err != nil {
 		panic(err)
 	}
 
-	hsd, err = packet.Encode(packet.Handshake, data)
+	//握手数据包, 已添加包头
+	hsd, err = packet.Encode(packet.Handshake, hsdata)
 	if err != nil {
 		panic(err)
 	}
 
+	// 心跳数据包, 已添加包头, 包体为空
 	hbd, err = packet.Encode(packet.Heartbeat, nil)
 	if err != nil {
 		panic(err)
 	}
 }
 
-// 获取握手响应, 缓存的
+// 获取握手数据包, 缓存的
 func getHsd() []byte {
 	servertime := []byte(strconv.FormatInt(time.Now().Unix(), 10))
-	return packet.Replace(hsd, hsdPlaceholder, servertime)
+	return packet.Replace(hsd, hsdTimePlaceHolderKey, servertime)
 }
 
-// 获取心跳请求, 缓存的
+// 获取心跳数据包, 缓存的
 func getHbd() []byte {
 	return hbd
 }

@@ -23,6 +23,8 @@ package packet
 import (
 	"bytes"
 	"errors"
+
+	"github.com/lonng/nano/internal/utils/buff"
 )
 
 // Codec constants.
@@ -129,7 +131,7 @@ func Encode(typ Type, data []byte) ([]byte, error) {
 
 // Replace 替换包中的占位符, 并调整包头长度
 func Replace(packet, old, new []byte) []byte {
-	buf := bytes.Replace(packet, old, new, 1)
+	buf := buff.Replace(packet, old, new, HeadLength)
 	copy(buf[1:HeadLength], intToBytes(len(buf)-HeadLength))
 	return buf
 }
