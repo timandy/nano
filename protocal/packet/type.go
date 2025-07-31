@@ -18,7 +18,7 @@ const (
 	Kick Type = 0x05 // disconnect message from server
 )
 
-var types = map[Type]string{
+var types = [6]string{
 	Handshake:    "Handshake",
 	HandshakeAck: "HandshakeAck",
 	Heartbeat:    "Heartbeat",

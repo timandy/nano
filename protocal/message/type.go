@@ -8,7 +8,7 @@ const (
 	Push     Type = 0x03
 )
 
-var types = map[Type]string{
+var types = [4]string{
 	Request:  "Request",
 	Notify:   "Notify",
 	Response: "Response",
