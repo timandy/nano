@@ -57,7 +57,7 @@ func NewDecoder() *Decoder {
 func (c *Decoder) forward() error {
 	header := c.buf.Next(HeadLength)
 	c.typ = header[0]
-	if c.typ < Handshake || c.typ > Kick {
+	if c.typ < byte(Handshake) || c.typ > byte(Kick) {
 		return ErrWrongPacketType
 	}
 	c.size = bytesToInt(header[1:])
@@ -115,7 +115,7 @@ func (c *Decoder) Decode(data []byte) ([]*Packet, error) {
 // --------|------------------------|--------
 // 1 byte packet type, 3 bytes packet data length(big end), and data segment
 func Encode(typ Type, data []byte) ([]byte, error) {
-	if typ < Handshake || typ > Kick {
+	if invalidType(typ) {
 		return nil, ErrWrongPacketType
 	}
 

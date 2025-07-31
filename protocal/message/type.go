@@ -3,9 +3,9 @@ package message
 // Message types
 const (
 	Request  Type = 0x00
-	Notify        = 0x01
-	Response      = 0x02
-	Push          = 0x03
+	Notify   Type = 0x01
+	Response Type = 0x02
+	Push     Type = 0x03
 )
 
 var types = map[Type]string{
