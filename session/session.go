@@ -87,14 +87,17 @@ func (s *Session) RPC(route string, v any) error {
 }
 
 // Push 推送消息给客户端
-func (s *Session) Push(route string, v any) error {
-	err := s.entity.Push(route, v)
-	if err != nil {
-		Event.FireMessagePushFailed(s, route, v, err)
-		return err
-	}
-	Event.FireMessagePushed(s, route, v)
-	return err
+func (s *Session) Push(route string, v any) (err error) {
+	route, v = Event.FireMessagePushing(s, route, v)
+	defer func() {
+		if err != nil {
+			Event.FireMessagePushFailed(s, route, v, err)
+			return
+		}
+		Event.FireMessagePushed(s, route, v)
+	}()
+	err = s.entity.Push(route, v)
+	return
 }
 
 // Response 响应消息给客户端

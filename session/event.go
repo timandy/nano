@@ -1,25 +1,31 @@
 package session
 
+// Event 应该在引擎启动前注册回调函数, 启动后就不要再注册了
 var Event = &event{}
 
 // SessionCallback 会话回调
-type SessionCallback func(*Session)
+type SessionCallback func(s *Session)
 
-// MessageCallback 会话消息回调
-type MessageCallback func(*Session, string, any)
+// MessagePreCallback 会话消息处理前回调, 可以修改消息内容和路由
+type MessagePreCallback func(s *Session, routePath string, msg any) (newRoutePath string, newMsg any)
 
-// MessageErrorCallback 会话消息错误回调
-type MessageErrorCallback func(*Session, string, any, error)
+// MessagePostCallback 会话消息处理成功回调
+type MessagePostCallback func(s *Session, routePath string, msg any)
+
+// MessagePostErrorCallback 会话消息处理错误回调
+type MessagePostErrorCallback func(s *Session, routePath string, msg any, err error)
 
 type event struct {
 	// 会话创建事件
 	onSessionCreated []SessionCallback
 	// 会话关闭事件
 	onSessionClosed []SessionCallback
+	// 消息推送前事件, 可以修改消息内容和路由
+	onMessagePushing []MessagePreCallback
 	// 消息推送成功事件, 只表示写入队列成功, 实际不一定到达客户端
-	onMessagePushed []MessageCallback
-	// 消息推送失败事件
-	onMessagePushFailed []MessageErrorCallback
+	onMessagePushed []MessagePostCallback
+	// 消息推送失败事件, 只表示写入队列失败, 肯定不会到达客户端
+	onMessagePushFailed []MessagePostErrorCallback
 }
 
 // SessionCreated 设置会话创建事件的回调
@@ -54,34 +60,51 @@ func (lt *event) FireSessionClosed(s *Session) {
 	}
 }
 
-// MessagePushed 设置消息推送事件的回调
-func (lt *event) MessagePushed(callback MessageCallback) {
+// MessagePushing 设置消息推送前的回调, 可以修改消息内容和路由
+func (lt *event) MessagePushing(callback MessagePreCallback) {
+	lt.onMessagePushing = append(lt.onMessagePushing, callback)
+}
+
+// FireMessagePushing 触发消息推送前事件, 可以修改消息内容和路由
+func (lt *event) FireMessagePushing(s *Session, routePath string, msg any) (string, any) {
+	if len(lt.onMessagePushing) == 0 {
+		return routePath, msg
+	}
+
+	for _, fn := range lt.onMessagePushing {
+		routePath, msg = fn(s, routePath, msg)
+	}
+	return routePath, msg
+}
+
+// MessagePushed 设置消息推送成功事件的回调
+func (lt *event) MessagePushed(callback MessagePostCallback) {
 	lt.onMessagePushed = append(lt.onMessagePushed, callback)
 }
 
-// FireMessagePushed 触发消息推送事件
-func (lt *event) FireMessagePushed(s *Session, routePath string, v any) {
+// FireMessagePushed 触发消息推送成功事件
+func (lt *event) FireMessagePushed(s *Session, routePath string, msg any) {
 	if len(lt.onMessagePushed) == 0 {
 		return
 	}
 
 	for _, fn := range lt.onMessagePushed {
-		fn(s, routePath, v)
+		fn(s, routePath, msg)
 	}
 }
 
 // MessagePushFailed 设置消息推送失败事件的回调
-func (lt *event) MessagePushFailed(callback MessageErrorCallback) {
+func (lt *event) MessagePushFailed(callback MessagePostErrorCallback) {
 	lt.onMessagePushFailed = append(lt.onMessagePushFailed, callback)
 }
 
 // FireMessagePushFailed 触发消息推送失败事件
-func (lt *event) FireMessagePushFailed(s *Session, routePath string, v any, err error) {
+func (lt *event) FireMessagePushFailed(s *Session, routePath string, msg any, err error) {
 	if len(lt.onMessagePushFailed) == 0 {
 		return
 	}
 
 	for _, fn := range lt.onMessagePushFailed {
-		fn(s, routePath, v, err)
+		fn(s, routePath, msg, err)
 	}
 }
