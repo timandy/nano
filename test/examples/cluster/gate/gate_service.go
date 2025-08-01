@@ -1,10 +1,11 @@
 package gate
 
 import (
+	"errors"
+
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/examples/cluster/protocol"
-	"github.com/pingcap/errors"
 )
 
 type BindService struct {
@@ -33,11 +34,11 @@ func (bs *BindService) Login(s *session.Session, msg *LoginRequest) error {
 		GateUid:  uid,
 	}
 	if err := s.RPC("TopicService.NewUser", request); err != nil {
-		return errors.Trace(err)
+		return err
 	}
 	return s.Response(&LoginResponse{})
 }
 
 func (bs *BindService) BindChatServer(s *session.Session, msg []byte) error {
-	return errors.Errorf("not implement")
+	return errors.New("not implement")
 }

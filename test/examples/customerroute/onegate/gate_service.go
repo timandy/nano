@@ -6,7 +6,6 @@ import (
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/examples/cluster/protocol"
-	"github.com/pingcap/errors"
 )
 
 type RegisterService struct {
@@ -38,7 +37,7 @@ func (bs *RegisterService) Login(s *session.Session, msg *RegisterRequest) error
 		MasterUid: uid,
 	}
 	if err := s.RPC("ChatRoomService.JoinRoom", chat); err != nil {
-		return errors.Trace(err)
+		return err
 	}
 	return s.Response(&RegisterResponse{})
 }

@@ -2,7 +2,6 @@ package cluster_test
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/lonng/nano/cluster"
@@ -11,12 +10,8 @@ import (
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/benchmark/testdata"
 	"github.com/lonng/nano/test/benchmark/ws"
-	. "github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
 )
-
-type nodeSuite struct{}
-
-var _ = Suite(&nodeSuite{})
 
 type (
 	MasterComponent struct{ component.Base }
@@ -44,11 +39,7 @@ func (c *GameComponent) Test2(session *session.Session, ping *testdata.Ping) err
 	return session.Response(&testdata.Pong{Content: "game server pong2"})
 }
 
-func TestNode(t *testing.T) {
-	TestingT(t)
-}
-
-func (s *nodeSuite) TestNodeStartup(c *C) {
+func TestNodeStartup(t *testing.T) {
 	scheduler.Start()
 	defer scheduler.Close()
 
@@ -61,7 +52,7 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	masterOpts.ServiceAddr = "127.0.0.1:4450"
 	masterNode := cluster.NewNode(nil, masterOpts)
 	masterHandler := masterNode.Handler()
-	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
+	assert.Equal(t, masterHandler.LocalService(), []string{"MasterComponent"})
 	//网关
 	memberGate := &component.Components{}
 	memberGate.Register(&GateComponent{})
@@ -72,10 +63,10 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	gateOpts.Components = memberGate
 	memberNode1 := cluster.NewNode(nil, gateOpts)
 	member1Handler := memberNode1.Handler()
-	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
-	c.Assert(masterHandler.RemoteService(), DeepEquals, []string{"GateComponent"})
-	c.Assert(member1Handler.LocalService(), DeepEquals, []string{"GateComponent"})
-	c.Assert(member1Handler.RemoteService(), DeepEquals, []string{"MasterComponent"})
+	assert.Equal(t, masterHandler.LocalService(), []string{"MasterComponent"})
+	assert.Equal(t, masterHandler.RemoteService(), []string{"GateComponent"})
+	assert.Equal(t, member1Handler.LocalService(), []string{"GateComponent"})
+	assert.Equal(t, member1Handler.RemoteService(), []string{"MasterComponent"})
 	//网关监听
 	mux1 := http.NewServeMux()
 	mux1.Handle("/ws", memberNode1)
@@ -90,12 +81,12 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	workerOpts.Components = memberWorker
 	memberNode2 := cluster.NewNode(nil, workerOpts)
 	member2Handler := memberNode2.Handler()
-	c.Assert(masterHandler.LocalService(), DeepEquals, []string{"MasterComponent"})
-	c.Assert(masterHandler.RemoteService(), DeepEquals, []string{"GameComponent", "GateComponent"})
-	c.Assert(member1Handler.LocalService(), DeepEquals, []string{"GateComponent"})
-	c.Assert(member1Handler.RemoteService(), DeepEquals, []string{"GameComponent", "MasterComponent"})
-	c.Assert(member2Handler.LocalService(), DeepEquals, []string{"GameComponent"})
-	c.Assert(member2Handler.RemoteService(), DeepEquals, []string{"GateComponent", "MasterComponent"})
+	assert.Equal(t, masterHandler.LocalService(), []string{"MasterComponent"})
+	assert.Equal(t, masterHandler.RemoteService(), []string{"GameComponent", "GateComponent"})
+	assert.Equal(t, member1Handler.LocalService(), []string{"GateComponent"})
+	assert.Equal(t, member1Handler.RemoteService(), []string{"GameComponent", "MasterComponent"})
+	assert.Equal(t, member2Handler.LocalService(), []string{"GameComponent"})
+	assert.Equal(t, member2Handler.RemoteService(), []string{"GateComponent", "MasterComponent"})
 
 	//客户端
 	connector := ws.NewConnector()
@@ -106,35 +97,34 @@ func (s *nodeSuite) TestNodeStartup(c *C) {
 	})
 
 	// Connect to gate server
-	if err := connector.Start("127.0.0.1:14452"); err != nil {
-		c.Assert(err, IsNil)
-	}
+	err := connector.Start("127.0.0.1:14452")
+	assert.NoError(t, err)
 	<-chWait
 	onResult := make(chan string)
 	connector.On("test", func(data any) {
 		onResult <- string(data.([]byte))
 	})
-	err := connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(<-onResult, "gate server pong"), IsTrue)
+	err = connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
+	assert.NoError(t, err)
+	assert.Contains(t, <-onResult, "gate server pong")
 
 	err = connector.Notify("GameComponent.Test", &testdata.Ping{Content: "ping"})
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(<-onResult, "game server pong"), IsTrue)
+	assert.NoError(t, err)
+	assert.Contains(t, <-onResult, "game server pong")
 
 	err = connector.Request("GateComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
 		onResult <- string(data.([]byte))
 	})
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(<-onResult, "gate server pong2"), IsTrue)
+	assert.NoError(t, err)
+	assert.Contains(t, <-onResult, "gate server pong2")
 
 	err = connector.Request("GameComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
 		onResult <- string(data.([]byte))
 	})
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(<-onResult, "game server pong2"), IsTrue)
+	assert.NoError(t, err)
+	assert.Contains(t, <-onResult, "game server pong2")
 
 	err = connector.Notify("MasterComponent.Test", &testdata.Ping{Content: "ping"})
-	c.Assert(err, IsNil)
-	c.Assert(strings.Contains(<-onResult, "master server pong"), IsTrue)
+	assert.NoError(t, err)
+	assert.Contains(t, <-onResult, "master server pong")
 }

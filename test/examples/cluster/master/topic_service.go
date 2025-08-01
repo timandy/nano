@@ -1,13 +1,13 @@
 package master
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/examples/cluster/protocol"
-	"github.com/pingcap/errors"
 )
 
 type User struct {
@@ -39,7 +39,7 @@ func (ts *TopicService) NewUser(s *session.Session, msg *protocol.NewUserRequest
 	ts.nextUid++
 	uid := ts.nextUid
 	if err := s.Bind(uid); err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	var members []string
@@ -48,7 +48,7 @@ func (ts *TopicService) NewUser(s *session.Session, msg *protocol.NewUserRequest
 	}
 	err := s.Push("onMembers", &ExistsMembersResponse{Members: strings.Join(members, ",")})
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	user := &User{
@@ -76,7 +76,7 @@ func (ts *TopicService) Stats(s *session.Session, msg *protocol.MasterStats) err
 	// It's OK to use map without lock because of this service running in main thread
 	user, found := ts.users[msg.Uid]
 	if !found {
-		return errors.Errorf("User not found: %v", msg.Uid)
+		return fmt.Errorf("user not found: %v", msg.Uid)
 	}
 	user.message++
 	user.balance--

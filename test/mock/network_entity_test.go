@@ -24,33 +24,25 @@ import (
 	"testing"
 
 	"github.com/lonng/nano/test/mock"
-	. "github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
 )
 
-type networkEntitySuite struct{}
-
 func TestNetworkEntity(t *testing.T) {
-	TestingT(t)
-}
-
-var _ = Suite(&networkEntitySuite{})
-
-func (s *networkEntitySuite) TestNetworkEntity(c *C) {
 	entity := mock.NewNetworkEntity()
 
-	c.Assert(entity.LastResponse(), IsNil)
-	c.Assert(entity.LastMid(), Equals, uint64(1))
-	c.Assert(entity.Response("hello"), IsNil)
-	c.Assert(entity.LastResponse().(string), Equals, "hello")
+	assert.Nil(t, entity.LastResponse())
+	assert.Equal(t, entity.LastMid(), uint64(1))
+	assert.Nil(t, entity.Response("hello"))
+	assert.Equal(t, entity.LastResponse().(string), "hello")
 
-	c.Assert(entity.FindResponseByMID(1), IsNil)
-	c.Assert(entity.ResponseMid(1, "test"), IsNil)
-	c.Assert(entity.FindResponseByMID(1).(string), Equals, "test")
+	assert.Nil(t, entity.FindResponseByMID(1))
+	assert.Nil(t, entity.ResponseMid(1, "test"))
+	assert.Equal(t, entity.FindResponseByMID(1).(string), "test")
 
-	c.Assert(entity.FindResponseByRoute("t.tt"), IsNil)
-	c.Assert(entity.Push("t.tt", "test"), IsNil)
-	c.Assert(entity.FindResponseByRoute("t.tt").(string), Equals, "test")
+	assert.Nil(t, entity.FindResponseByRoute("t.tt"))
+	assert.Nil(t, entity.Push("t.tt", "test"))
+	assert.Equal(t, entity.FindResponseByRoute("t.tt").(string), "test")
 
-	c.Assert(entity.RemoteAddr().String(), Equals, "mock-addr")
-	c.Assert(entity.Close(), IsNil)
+	assert.Equal(t, entity.RemoteAddr().String(), "mock-addr")
+	assert.Nil(t, entity.Close())
 }

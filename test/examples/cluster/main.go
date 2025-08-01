@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 	"github.com/lonng/nano/test/examples/cluster/chat"
 	"github.com/lonng/nano/test/examples/cluster/gate"
 	"github.com/lonng/nano/test/examples/cluster/master"
-	"github.com/pingcap/errors"
 	"github.com/urfave/cli/v2"
 )
 
@@ -85,7 +85,7 @@ func srcPath() string {
 func runMaster(args *cli.Context) error {
 	listen := args.String("listen")
 	if listen == "" {
-		return errors.Errorf("master listen address cannot empty")
+		return errors.New("master listen address cannot empty")
 	}
 
 	webDir := filepath.Join(srcPath(), "master", "web")
@@ -121,17 +121,17 @@ func runMaster(args *cli.Context) error {
 func runGate(args *cli.Context) error {
 	listen := args.String("listen")
 	if listen == "" {
-		return errors.Errorf("gate listen address cannot empty")
+		return errors.New("gate listen address cannot empty")
 	}
 
 	masterAddr := args.String("master")
 	if masterAddr == "" {
-		return errors.Errorf("master address cannot empty")
+		return errors.New("master address cannot empty")
 	}
 
 	gateAddr := args.String("gate-address")
 	if gateAddr == "" {
-		return errors.Errorf("gate address cannot empty")
+		return errors.New("gate address cannot empty")
 	}
 
 	log.Info("Current server listen address", listen)
@@ -156,12 +156,12 @@ func runGate(args *cli.Context) error {
 func runChat(args *cli.Context) error {
 	listen := args.String("listen")
 	if listen == "" {
-		return errors.Errorf("chat listen address cannot empty")
+		return errors.New("chat listen address cannot empty")
 	}
 
 	masterAddr := args.String("master")
 	if masterAddr == "" {
-		return errors.Errorf("master address cannot empty")
+		return errors.New("master address cannot empty")
 	}
 
 	log.Info("Current chat server listen address", listen)
