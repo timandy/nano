@@ -203,7 +203,7 @@ func (a *agent) Close() error {
 		// expect
 	default:
 		close(a.chDie)
-		scheduler.PushTask(func() { session.Event.FireSessionClosed(a.session) })
+		scheduler.Execute(func() { session.Event.FireSessionClosed(a.session) })
 	}
 
 	return a.conn.Close()

@@ -49,7 +49,7 @@ func TestNode(t *testing.T) {
 }
 
 func (s *nodeSuite) TestNodeStartup(c *C) {
-	go scheduler.Sched()
+	scheduler.Start()
 	defer scheduler.Close()
 
 	//注册中心

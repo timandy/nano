@@ -470,16 +470,16 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 			log.Info("nanl/handler: cannot found `schedular.LocalScheduler` by %s", s.SchedName)
 			return
 		}
-		local, ok := sched.(scheduler.LocalScheduler)
+		local, ok := sched.(scheduler.Executor)
 		if !ok {
 			log.Info("nanl/handler: Type %T does not implement the `schedular.LocalScheduler` interface", sched)
 			return
 		}
-		local.Schedule(task)
+		local.Execute(task)
 		return
 	}
 	//全局协程
-	scheduler.PushTask(task)
+	scheduler.Execute(task)
 }
 
 // findMembers 远程处理时, 查找服务对应的成员

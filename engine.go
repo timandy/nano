@@ -129,7 +129,7 @@ func (engine *Engine) Startup() error {
 		return errors.New("nano has running")
 	}
 	engine.node = cluster.NewNode(engine, engine.opts)
-	go scheduler.Sched()
+	scheduler.Start()
 	return nil
 }
 

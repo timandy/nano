@@ -62,7 +62,7 @@ func (w worker) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*
 func (w worker) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
 	s, found := w.node.delSession(req.SessionId)
 	if found {
-		scheduler.PushTask(func() { session.Event.FireSessionClosed(s) })
+		scheduler.Execute(func() { session.Event.FireSessionClosed(s) })
 	}
 	return &clusterpb.SessionClosedResponse{}, nil
 }
