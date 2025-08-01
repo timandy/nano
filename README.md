@@ -111,7 +111,7 @@ func (manager *PlayerManager) Login(s *session.Session, msg *ReqPlayerLogin) err
 
 ## Go version
 
-`> go1.8`
+`>= go1.20`
 
 ## Installation
 
@@ -119,13 +119,7 @@ func (manager *PlayerManager) Login(s *session.Session, msg *ReqPlayerLogin) err
 go get github.com/lonng/nano
 
 # dependencies
-go get -u github.com/pingcap/check
-go get -u github.com/pingcap/errors
-go get -u github.com/urfave/cli
-
-go get -u google.golang.org/protobuf/proto
-go get -u github.com/gorilla/websocket
-go get -u google.golang.org/grpc
+go mod tidy
 ```
 
 ## Protocol Buffers
