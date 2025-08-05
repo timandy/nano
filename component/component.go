@@ -20,7 +20,7 @@
 
 package component
 
-var reservedMethods = []string{"Register", "Init", "AfterInit", "BeforeShutdown", "Shutdown"}
+var reservedMethods = []string{"Register", "Executor", "Init", "AfterInit", "BeforeShutdown", "Shutdown"}
 
 // Component is the interface that represent a component.
 type Component interface {

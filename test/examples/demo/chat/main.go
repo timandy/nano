@@ -14,6 +14,7 @@ import (
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/protocal/serialize/json"
 	"github.com/lonng/nano/scheduler"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session"
 )
 
@@ -25,7 +26,7 @@ type (
 	// RoomManager represents a component that contains a bundle of room
 	RoomManager struct {
 		component.Base
-		timer *scheduler.Timer
+		timer schedulerapi.Timer
 		rooms map[int]*Room
 	}
 
@@ -53,7 +54,7 @@ type (
 
 	stats struct {
 		component.Base
-		timer         *scheduler.Timer
+		timer         schedulerapi.Timer
 		outboundBytes int
 		inboundBytes  int
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/protocal/message"
-	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 )
 
@@ -62,7 +61,7 @@ func (w worker) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*
 func (w worker) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
 	s, found := w.node.delSession(req.SessionId)
 	if found {
-		scheduler.Execute(func() { session.Event.FireSessionClosed(s) })
+		s.Execute(func() { session.Event.FireSessionClosed(s) })
 	}
 	return &clusterpb.SessionClosedResponse{}, nil
 }

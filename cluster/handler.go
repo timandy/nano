@@ -39,7 +39,7 @@ import (
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
-	"github.com/lonng/nano/scheduler"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session"
 )
 
@@ -463,23 +463,16 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 		c.Next()
 	}
 
-	// 消息可以分派到全局协程或用户自定义协程, 默认是全局协程
-	if s, found := h.localServices[service]; found && s.SchedName != "" {
-		sched := session.Value(s.SchedName)
-		if sched == nil {
-			log.Info("nanl/handler: cannot found `schedular.LocalScheduler` by %s", s.SchedName)
-			return
+	// component 级别的执行器
+	executorFactory := func() schedulerapi.Executor {
+		if s, found := h.localServices[service]; found {
+			return s.Executor
 		}
-		local, ok := sched.(scheduler.Executor)
-		if !ok {
-			log.Info("nanl/handler: Type %T does not implement the `schedular.LocalScheduler` interface", sched)
-			return
-		}
-		local.Execute(task)
-		return
+		return nil
 	}
-	//全局协程
-	scheduler.Execute(task)
+
+	// 按优先级调度任务
+	session.Execute(task, executorFactory)
 }
 
 // findMembers 远程处理时, 查找服务对应的成员

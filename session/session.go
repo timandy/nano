@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lonng/nano/scheduler"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session/service"
 )
 
@@ -49,13 +51,15 @@ var (
 // Session 会话表示一个客户端会话，可以在低级保持连接期间存储临时数据，当低级连接断开时，所有数据都会被释放。
 // 与客户端相关的会话实例将作为第一个参数传递给构造函数。
 type Session struct {
-	mu       sync.RWMutex   // protect data
-	id       int64          // session global unique id
-	uid      int64          // binding user id
-	lastTime int64          // last heartbeat time
-	entity   NetworkEntity  // low-level network entity
-	data     map[string]any // session data store
-	router   *Router
+	id         int64                 // session global unique id
+	uid        int64                 // binding user id
+	lastTime   int64                 // last heartbeat time
+	entity     NetworkEntity         // low-level network entity
+	data       map[string]any        // session data store
+	dataMu     sync.RWMutex          // protect data
+	executor   schedulerapi.Executor // executor for session tasks
+	executorMu sync.RWMutex          // read write executor lock
+	router     *Router               // routing table
 }
 
 // New 返回新的会话实例 NetworkEntity 是低级网络实例
@@ -142,24 +146,24 @@ func (s *Session) RemoteAddr() net.Addr {
 
 // Remove delete data associated with the key from session storage
 func (s *Session) Remove(key string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.dataMu.Lock()
+	defer s.dataMu.Unlock()
 
 	delete(s.data, key)
 }
 
 // Set associates value with the key in session storage
 func (s *Session) Set(key string, value any) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.dataMu.Lock()
+	defer s.dataMu.Unlock()
 
 	s.data[key] = value
 }
 
 // HasKey decides whether a key has associated value
 func (s *Session) HasKey(key string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	_, has := s.data[key]
 	return has
@@ -167,8 +171,8 @@ func (s *Session) HasKey(key string) bool {
 
 // Int returns the value associated with the key as a int.
 func (s *Session) Int(key string) int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -184,8 +188,8 @@ func (s *Session) Int(key string) int {
 
 // Int8 returns the value associated with the key as a int8.
 func (s *Session) Int8(key string) int8 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -201,8 +205,8 @@ func (s *Session) Int8(key string) int8 {
 
 // Int16 returns the value associated with the key as a int16.
 func (s *Session) Int16(key string) int16 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -218,8 +222,8 @@ func (s *Session) Int16(key string) int16 {
 
 // Int32 returns the value associated with the key as a int32.
 func (s *Session) Int32(key string) int32 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -235,8 +239,8 @@ func (s *Session) Int32(key string) int32 {
 
 // Int64 returns the value associated with the key as a int64.
 func (s *Session) Int64(key string) int64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -252,8 +256,8 @@ func (s *Session) Int64(key string) int64 {
 
 // Uint returns the value associated with the key as a uint.
 func (s *Session) Uint(key string) uint {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -269,8 +273,8 @@ func (s *Session) Uint(key string) uint {
 
 // Uint8 returns the value associated with the key as a uint8.
 func (s *Session) Uint8(key string) uint8 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -286,8 +290,8 @@ func (s *Session) Uint8(key string) uint8 {
 
 // Uint16 returns the value associated with the key as a uint16.
 func (s *Session) Uint16(key string) uint16 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -303,8 +307,8 @@ func (s *Session) Uint16(key string) uint16 {
 
 // Uint32 returns the value associated with the key as a uint32.
 func (s *Session) Uint32(key string) uint32 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -320,8 +324,8 @@ func (s *Session) Uint32(key string) uint32 {
 
 // Uint64 returns the value associated with the key as a uint64.
 func (s *Session) Uint64(key string) uint64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -337,8 +341,8 @@ func (s *Session) Uint64(key string) uint64 {
 
 // Float32 returns the value associated with the key as a float32.
 func (s *Session) Float32(key string) float32 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -354,8 +358,8 @@ func (s *Session) Float32(key string) float32 {
 
 // Float64 returns the value associated with the key as a float64.
 func (s *Session) Float64(key string) float64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -371,8 +375,8 @@ func (s *Session) Float64(key string) float64 {
 
 // String returns the value associated with the key as a string.
 func (s *Session) String(key string) string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	v, ok := s.data[key]
 	if !ok {
@@ -388,32 +392,32 @@ func (s *Session) String(key string) string {
 
 // Value returns the value associated with the key as a any.
 func (s *Session) Value(key string) any {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	return s.data[key]
 }
 
 // State 返回所有会话所有数据
 func (s *Session) State() map[string]any {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
 
 	return s.data
 }
 
 // Restore 重新连接后的会话数据
 func (s *Session) Restore(data map[string]any) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.dataMu.Lock()
+	defer s.dataMu.Unlock()
 
 	s.data = data
 }
 
 // Clear 释放与当前会话相关的所有数据
 func (s *Session) Clear() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.dataMu.Lock()
+	defer s.dataMu.Unlock()
 
 	atomic.StoreInt64(&s.uid, 0)
 	s.data = map[string]any{}
@@ -422,4 +426,56 @@ func (s *Session) Clear() {
 // Close 终止当前会话，会话相关数据将不会被释放，所有相关数据都应在会话关闭回调中显式清除
 func (s *Session) Close() {
 	_ = s.entity.Close()
+}
+
+// BindExecutor 绑定执行器
+func (s *Session) BindExecutor(executor schedulerapi.Executor) {
+	if executor == nil {
+		return
+	}
+
+	s.executorMu.Lock()
+	defer s.executorMu.Unlock()
+
+	s.executor = executor
+}
+
+// UnbindExecutor 解除执行器
+func (s *Session) UnbindExecutor() {
+	s.executorMu.Lock()
+	defer s.executorMu.Unlock()
+
+	s.executor = nil
+}
+
+// Execute 执行任务
+func (s *Session) Execute(task func(), executorFactory ...func() schedulerapi.Executor) {
+	// session 级别的执行器
+	executor := s.getExecutor()
+	if executor != nil && executor.Execute(task) {
+		return
+	}
+	// 外部传入的执行器, 一般是 component 级别的执行器
+	for _, fac := range executorFactory {
+		if fac == nil {
+			continue
+		}
+		executor = fac()
+		if executor == nil {
+			continue
+		}
+		if !executor.Execute(task) {
+			continue
+		}
+	}
+	// 全局级别执行器
+	scheduler.Execute(task)
+}
+
+// getExecutor 获取当前会话的执行器
+func (s *Session) getExecutor() schedulerapi.Executor {
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
+
+	return s.executor
 }

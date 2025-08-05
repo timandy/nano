@@ -33,7 +33,6 @@ import (
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
-	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 )
 
@@ -203,7 +202,8 @@ func (a *agent) Close() error {
 		// expect
 	default:
 		close(a.chDie)
-		scheduler.Execute(func() { session.Event.FireSessionClosed(a.session) })
+		s := a.session
+		s.Execute(func() { session.Event.FireSessionClosed(s) })
 	}
 
 	return a.conn.Close()
@@ -242,7 +242,7 @@ func (a *agent) write() {
 		if !forceQuit {
 			a.flush(chWrite)
 		}
-		a.Close()
+		_ = a.Close()
 		if env.Debug {
 			log.Info("Session write goroutine exit, SessionID=%d, UID=%d", a.session.ID(), a.session.UID())
 		}

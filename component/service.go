@@ -27,17 +27,18 @@ import (
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/protocal/serialize/protobuf"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 )
 
 // Service implements a specific service, some of it's methods will be
 // called when the correspond events is occurred.
 type Service struct {
-	Name      string              // name of service
-	Type      reflect.Type        // type of the receiver
-	Receiver  reflect.Value       // receiver of methods for the service
-	Handlers  map[string]*Handler // registered methods
-	SchedName string              // name of scheduler variable in session data
-	Options   options             // options
+	Name     string                // name of service
+	Type     reflect.Type          // type of the receiver
+	Receiver reflect.Value         // receiver of methods for the service
+	Handlers map[string]*Handler   // registered methods
+	Executor schedulerapi.Executor // executor for the service, used to execute the handlers
+	Options  options               // options
 }
 
 func NewService(comp Component, opts []Option) *Service {
@@ -56,7 +57,7 @@ func NewService(comp Component, opts []Option) *Service {
 	} else {
 		s.Name = reflect.Indirect(s.Receiver).Type().Name()
 	}
-	s.SchedName = s.Options.schedName
+	s.Executor = s.Options.executor
 
 	return s
 }

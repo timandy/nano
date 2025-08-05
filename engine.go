@@ -128,8 +128,8 @@ func (engine *Engine) Startup() error {
 	if !atomic.CompareAndSwapInt32(&engine.running, 0, 1) {
 		return errors.New("nano has running")
 	}
-	engine.node = cluster.NewNode(engine, engine.opts)
 	scheduler.Start()
+	engine.node = cluster.NewNode(engine, engine.opts)
 	return nil
 }
 
