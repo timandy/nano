@@ -57,7 +57,7 @@ type agent struct {
 	session    *session.Session    // session
 	conn       net.Conn            // low-level conn fd
 	lastMid    uint64              // last message id
-	state      int32               // current agent state
+	state      atomic.Int32        // current agent state
 	chDie      chan struct{}       // wait for close
 	chSend     chan pendingMessage // push message queue
 	lastAt     int64               // last heartbeat unix time stamp
@@ -78,7 +78,6 @@ type pendingMessage struct {
 func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) *agent {
 	a := &agent{
 		conn:       conn,
-		state:      statusStart,
 		chDie:      make(chan struct{}),
 		lastAt:     time.Now().Unix(),
 		chSend:     make(chan pendingMessage, agentWriteBacklog),
@@ -86,6 +85,7 @@ func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) 
 		pipeline:   pipeline,
 		rpcHandler: rpcHandler,
 	}
+	a.state.Store(statusStart)
 
 	// binding session
 	s := session.New(a)
@@ -151,13 +151,13 @@ func (a *agent) RPC(route string, v any) error {
 	return nil
 }
 
-// Response, implementation for session.NetworkEntity interface
+// Response implementation for session.NetworkEntity interface
 // Response message to session
 func (a *agent) Response(v any) error {
 	return a.ResponseMid(a.lastMid, v)
 }
 
-// ResponseMid, implementation for session.NetworkEntity interface
+// ResponseMid implementation for session.NetworkEntity interface
 // Response message to session
 func (a *agent) ResponseMid(mid uint64, v any) error {
 	if a.status() == statusClosed {
@@ -184,7 +184,7 @@ func (a *agent) ResponseMid(mid uint64, v any) error {
 	return a.send(pendingMessage{typ: message.Response, mid: mid, payload: v})
 }
 
-// Close, implementation for session.NetworkEntity interface
+// Close implementation for session.NetworkEntity interface
 // Close closes the agent, clean inner state and close low-level connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (a *agent) Close() error {
@@ -210,8 +210,7 @@ func (a *agent) Close() error {
 	return a.conn.Close()
 }
 
-// RemoteAddr, implementation for session.NetworkEntity interface
-// returns the remote network address.
+// RemoteAddr implementation for session.NetworkEntity interface returns the remote network address.
 func (a *agent) RemoteAddr() net.Addr {
 	return a.conn.RemoteAddr()
 }
@@ -222,11 +221,11 @@ func (a *agent) String() string {
 }
 
 func (a *agent) status() int32 {
-	return atomic.LoadInt32(&a.state)
+	return a.state.Load()
 }
 
 func (a *agent) setStatus(state int32) {
-	atomic.StoreInt32(&a.state, state)
+	a.state.Store(state)
 }
 
 func (a *agent) write() {
