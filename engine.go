@@ -49,7 +49,7 @@ type Engine struct {
 	allNoRoute npi.HandlersChain
 	noRoute    npi.HandlersChain
 
-	running int32
+	running atomic.Bool
 	node    *cluster.Node
 	opts    *cluster.Options
 }
@@ -64,7 +64,6 @@ func New(opts ...Option) *Engine {
 		trees:      npi.HandlerTrees{},
 		allNoRoute: nil,
 		noRoute:    nil,
-		running:    0,
 		opts:       options,
 	}
 	engine.RouterGroup = npi.NewRootGroup(engine)
@@ -125,7 +124,7 @@ func (engine *Engine) Register(component component.Component, options ...compone
 
 // Startup 启动引擎
 func (engine *Engine) Startup() error {
-	if !atomic.CompareAndSwapInt32(&engine.running, 0, 1) {
+	if !engine.running.CompareAndSwap(false, true) {
 		return errors.New("nano has running")
 	}
 	scheduler.Start()
@@ -135,11 +134,13 @@ func (engine *Engine) Startup() error {
 
 // Shutdown 发送信号并关闭 nano
 func (engine *Engine) Shutdown() {
+	if !engine.running.CompareAndSwap(true, false) {
+		return
+	}
 	if engine.node != nil {
 		engine.node.Shutdown()
 	}
 	scheduler.Close()
-	atomic.StoreInt32(&engine.running, 0)
 }
 
 // RunTcp 启动 TCP 服务
