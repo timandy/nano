@@ -7,12 +7,20 @@ import (
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/scheduler/defscheduler"
 	"github.com/lonng/nano/scheduler/schedulerapi"
+	"github.com/lonng/nano/scheduler/twscheduler"
+)
+
+// 时间轮常量
+const (
+	heartbeatSlotNum = 16               // 时间轮, 槽位数
+	heartbeatOffset  = 10 * time.Second // 时间轮, 一圈冗余的时间
 )
 
 // 默认的全局调度器
 var (
-	mu      sync.Mutex
-	Default schedulerapi.Scheduler
+	mu        sync.Mutex             //锁
+	Default   schedulerapi.Scheduler //默认调度器
+	Heartbeat schedulerapi.Scheduler //心跳调度器
 )
 
 // Replace 替换默认的调度器
@@ -36,8 +44,19 @@ func Start() {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// 防止重复启动
+	if Default != nil {
+		return
+	}
+
+	// 初始化默认调度器
 	Default = defscheduler.NewScheduler("default", env.TimerPrecision)
 	Default.Start()
+
+	// 初始化心跳调度器
+	heartbeatTick := (env.HeartbeatInterval + heartbeatOffset) / heartbeatSlotNum
+	Heartbeat = twscheduler.NewScheduler("heartbeat", heartbeatTick, heartbeatSlotNum)
+	Heartbeat.Start()
 }
 
 // Close 关闭, 停止所有定时器和任务
@@ -45,8 +64,14 @@ func Close() {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// 关闭默认调度器
 	if Default != nil {
 		Default.Close()
+	}
+
+	// 关闭心跳调度器
+	if Heartbeat != nil {
+		Heartbeat.Close()
 	}
 }
 

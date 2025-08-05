@@ -33,6 +33,7 @@ import (
 	"github.com/lonng/nano/pipeline"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
+	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 )
 
@@ -230,7 +231,7 @@ func (a *agent) setStatus(state int32) {
 
 func (a *agent) write() {
 	heartbeat := env.HeartbeatInterval
-	ticker := time.NewTicker(heartbeat)
+	ticker := scheduler.Heartbeat.NewTicker(heartbeat)
 	chWrite := make(chan []byte, agentWriteBacklog)
 	forceQuit := false
 	// clean func

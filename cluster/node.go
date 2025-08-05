@@ -35,6 +35,7 @@ import (
 	nhttp "github.com/lonng/nano/internal/http"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/npi"
+	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 	"google.golang.org/grpc"
 )
@@ -291,7 +292,7 @@ func (n *Node) keepalive() {
 
 // startHeartbeatTimer 启动心跳定时器, 每隔一段时间向 Master 发送一次心跳请求
 func (n *Node) startHeartbeatTimer() {
-	ticker := time.NewTicker(env.HeartbeatInterval)
+	ticker := scheduler.Heartbeat.NewTicker(env.HeartbeatInterval)
 	for {
 		select {
 		case <-ticker.C:

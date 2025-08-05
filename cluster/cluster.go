@@ -29,6 +29,7 @@ import (
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
+	"github.com/lonng/nano/scheduler"
 )
 
 var _ clusterpb.MasterServer = (*cluster)(nil)
@@ -48,7 +49,7 @@ type cluster struct {
 func newCluster(node *Node) *cluster {
 	c := &cluster{node: node}
 	if node.opts.NodeType.IsMaster() {
-		c.startHeartbeatTimer()
+		c.startHeartbeatCheckTimer()
 	}
 	return c
 }
@@ -222,13 +223,13 @@ func (c *cluster) delMember(addr string) {
 	}
 }
 
-func (c *cluster) startHeartbeatTimer() {
+func (c *cluster) startHeartbeatCheckTimer() {
 	if !c.node.opts.NodeType.IsMaster() {
 		return
 	}
 
 	go func() {
-		ticker := time.NewTicker(env.HeartbeatInterval)
+		ticker := scheduler.Heartbeat.NewTicker(env.HeartbeatInterval)
 		for {
 			select {
 			case <-ticker.C:
