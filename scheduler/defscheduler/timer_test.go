@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,28 +18,28 @@ func TestTimer_BasicFunctionality(t *testing.T) {
 
 	t.Run("Timer Stop", func(t *testing.T) {
 		timer := newTimer(1, time.Second, func() {})
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 
 		timer.Stop()
-		assert.True(t, timer.isStopped())
+		assert.True(t, timer.Stopped())
 
 		// 重复停止应该安全
 		timer.Stop()
-		assert.True(t, timer.isStopped())
+		assert.True(t, timer.Stopped())
 	})
 
 	t.Run("Timer Countdown", func(t *testing.T) {
 		timer := newCountTimer(1, time.Second, 3, func() {})
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 
 		timer.countdown()
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 
 		timer.countdown()
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 
 		timer.countdown()
-		assert.True(t, timer.isStopped())
+		assert.True(t, timer.Stopped())
 	})
 
 	t.Run("Infinite Timer Countdown", func(t *testing.T) {
@@ -46,7 +47,7 @@ func TestTimer_BasicFunctionality(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			timer.countdown()
 		}
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 	})
 }
 
@@ -54,7 +55,7 @@ func TestTimer_BasicFunctionality(t *testing.T) {
 func TestTimer_Execution(t *testing.T) {
 	t.Run("Interval Timer Execution", func(t *testing.T) {
 		var execCount atomic.Int32
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		defer s.Close()
 
 		timer := newTimer(1, 50*time.Millisecond, func() {
@@ -78,7 +79,7 @@ func TestTimer_Execution(t *testing.T) {
 
 	t.Run("Stopped Timer Should Not Execute", func(t *testing.T) {
 		var execCount atomic.Int32
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		defer s.Close()
 
 		timer := newTimer(1, 10*time.Millisecond, func() {
@@ -99,26 +100,26 @@ func TestTimer_CreateTimer(t *testing.T) {
 	t.Run("Create Timer With Count", func(t *testing.T) {
 		timer := createTimer(1, func() {}, time.Second, nil, 5)
 		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, time.Second, timer.interval)
+		assert.Equal(t, int64(time.Second), timer.interval)
 		assert.Nil(t, timer.condition)
 		assert.Equal(t, int64(5), timer.counter.Load())
-		assert.Equal(t, int64(time.Second), timer.elapse)
+		assert.Greater(t, timer.when-time.Now().UnixNano(), int64(time.Second-2*time.Millisecond))
 	})
 
 	t.Run("Create Timer With Condition", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := createTimer(2, func() {}, time.Hour, cond, infinite)
+		timer := createTimer(2, func() {}, time.Hour, cond, schedulerapi.Infinite)
 		assert.Equal(t, int64(2), timer.id)
-		assert.Equal(t, time.Hour, timer.interval)
+		assert.EqualValues(t, int64(time.Hour), timer.interval)
 		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, infinite, timer.counter.Load())
-		assert.Equal(t, int64(time.Hour), timer.elapse)
+		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		assert.Greater(t, timer.when-time.Now().UnixNano(), int64(time.Hour-time.Second))
 	})
 
 	t.Run("Create Timer With Zero Count", func(t *testing.T) {
 		timer := createTimer(3, func() {}, time.Second, nil, 0)
 		assert.Equal(t, int64(0), timer.counter.Load())
-		assert.True(t, timer.isStopped())
+		assert.True(t, timer.Stopped())
 	})
 }
 
@@ -128,7 +129,7 @@ func TestTimer_ConditionTimer(t *testing.T) {
 
 	t.Run("Condition Timer Basic", func(t *testing.T) {
 		var execCount atomic.Int32
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		defer s.Close()
 
 		timer := newCondTimer(1, cond, func() {
@@ -153,7 +154,7 @@ func TestTimer_ConditionTimer(t *testing.T) {
 
 	t.Run("Condition Count Timer", func(t *testing.T) {
 		var execCount atomic.Int32
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		defer s.Close()
 
 		timer := newCondCountTimer(1, cond, 2, func() {
@@ -169,13 +170,13 @@ func TestTimer_ConditionTimer(t *testing.T) {
 		timer.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(1), execCount.Load())
-		assert.False(t, timer.isStopped())
+		assert.False(t, timer.Stopped())
 
 		// 第二次执行
 		timer.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(2), execCount.Load())
-		assert.True(t, timer.isStopped())
+		assert.True(t, timer.Stopped())
 
 		// 第三次不应该执行
 		timer.exec(s, now, ts)

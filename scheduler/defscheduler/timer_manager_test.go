@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ import (
 func TestTimerManager(t *testing.T) {
 	t.Run("Add Timer", func(t *testing.T) {
 		tm := &timerManager{
-			timers: make(map[int64]*Timer),
+			timers: make(map[int64]*timer),
 		}
 
 		timer := newTimer(1, time.Second, func() {})
@@ -25,7 +26,7 @@ func TestTimerManager(t *testing.T) {
 
 	t.Run("Steal Timers", func(t *testing.T) {
 		tm := &timerManager{
-			timers: make(map[int64]*Timer),
+			timers: make(map[int64]*timer),
 		}
 
 		timer1 := newTimer(1, time.Second, func() {})
@@ -46,12 +47,12 @@ func TestTimerManager(t *testing.T) {
 	})
 
 	t.Run("Cron Execution", func(t *testing.T) {
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		defer s.Close()
 
 		var execCount atomic.Int32
 		tm := &timerManager{
-			timers: make(map[int64]*Timer),
+			timers: make(map[int64]*timer),
 		}
 
 		// 创建一个会自动停止的定时器
@@ -71,7 +72,7 @@ func TestTimerManager(t *testing.T) {
 
 	t.Run("Concurrent Add Timer", func(t *testing.T) {
 		tm := &timerManager{
-			timers: make(map[int64]*Timer),
+			timers: make(map[int64]*timer),
 		}
 
 		const numGoroutines = 100
@@ -103,14 +104,14 @@ func TestTimerManager(t *testing.T) {
 // TestTimerManager_NewTimerMethods 测试定时器管理器的创建方法
 func TestTimerManager_NewTimerMethods(t *testing.T) {
 	tm := &timerManager{
-		timers: make(map[int64]*Timer),
+		timers: make(map[int64]*timer),
 	}
 
 	t.Run("NewTimer", func(t *testing.T) {
 		timer := tm.newTimer(time.Second, func() {})
 		assert.NotNil(t, timer)
 		assert.Equal(t, int64(1), timer.ID())
-		assert.Equal(t, infinite, timer.counter.Load())
+		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
 	})
 
 	t.Run("NewCountTimer", func(t *testing.T) {
@@ -132,7 +133,7 @@ func TestTimerManager_NewTimerMethods(t *testing.T) {
 		timer := tm.newCondTimer(cond, func() {})
 		assert.NotNil(t, timer)
 		assert.Equal(t, int64(4), timer.ID())
-		assert.Equal(t, infinite, timer.counter.Load())
+		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
 		assert.NotNil(t, timer.condition)
 	})
 
@@ -149,7 +150,7 @@ func TestTimerManager_NewTimerMethods(t *testing.T) {
 // TestTimerManager_StealTimersRaceCondition 测试stealTimers的数据竞争
 func TestTimerManager_StealTimersRaceCondition(t *testing.T) {
 	tm := &timerManager{
-		timers: make(map[int64]*Timer),
+		timers: make(map[int64]*timer),
 	}
 
 	const numGoroutines = 50
@@ -194,56 +195,63 @@ func TestTimerManager_StealTimersRaceCondition(t *testing.T) {
 // TestTimerManager_ErrorCases 测试定时器管理器的错误情况
 func TestTimerManager_ErrorCases(t *testing.T) {
 	tm := &timerManager{
-		timers: make(map[int64]*Timer),
+		timers: make(map[int64]*timer),
 	}
 
-	t.Run("Nil Function Panics", func(t *testing.T) {
+	t.Run("Nil function panic", func(t *testing.T) {
 		assert.Panics(t, func() {
 			tm.newTimer(time.Second, nil)
 		})
-
 		assert.Panics(t, func() {
-			tm.newCountTimer(time.Second, 1, nil)
+			tm.newCountTimer(time.Second, 5, nil)
 		})
-
 		assert.Panics(t, func() {
 			tm.newAfterTimer(time.Second, nil)
 		})
-
 		assert.Panics(t, func() {
 			tm.newCondTimer(&testCondition{}, nil)
 		})
-
 		assert.Panics(t, func() {
-			tm.newCondCountTimer(&testCondition{}, 1, nil)
+			tm.newCondCountTimer(&testCondition{}, 5, nil)
 		})
 	})
 
-	t.Run("Invalid Interval Panics", func(t *testing.T) {
+	t.Run("Non-positive interval panic", func(t *testing.T) {
 		assert.Panics(t, func() {
 			tm.newTimer(0, func() {})
 		})
-
 		assert.Panics(t, func() {
 			tm.newTimer(-time.Second, func() {})
 		})
-
 		assert.Panics(t, func() {
-			tm.newCountTimer(0, 1, func() {})
+			tm.newCountTimer(0, 5, func() {})
 		})
-
 		assert.Panics(t, func() {
-			tm.newAfterTimer(-time.Second, func() {})
+			tm.newAfterTimer(0, func() {})
+		})
+		assert.Panics(t, func() {
+			tm.newAfterTicker(0)
+		})
+		assert.Panics(t, func() {
+			tm.newTicker(0)
+		})
+		assert.Panics(t, func() {
+			tm.newCountTicker(0, 5)
 		})
 	})
 
-	t.Run("Nil Condition Panics", func(t *testing.T) {
+	t.Run("Nil condition panic", func(t *testing.T) {
 		assert.Panics(t, func() {
 			tm.newCondTimer(nil, func() {})
 		})
-
 		assert.Panics(t, func() {
-			tm.newCondCountTimer(nil, 1, func() {})
+			tm.newCondCountTimer(nil, 5, func() {})
+		})
+		assert.Panics(t, func() {
+			tm.newCondTicker(nil)
+		})
+		assert.Panics(t, func() {
+			tm.newCondCountTicker(nil, 5)
 		})
 	})
 }

@@ -6,83 +6,39 @@ import (
 
 	"github.com/lonng/nano/internal/env"
 	"github.com/lonng/nano/internal/log"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/timandy/routine"
-)
-
-// Task 定义一个任务类型
-type Task func()
-
-// Executor 执行器接口
-type Executor interface {
-	// Start 启动执行器
-	Start()
-
-	// Execute 提交一个任务到执行器
-	Execute(task Task)
-
-	// Close 关闭执行器, 停止所有任务
-	Close()
-}
-
-// Scheduler 调度器接口
-type Scheduler interface {
-	// Start 启动调度器
-	Start()
-
-	// Execute 提交一个任务到调度器
-	Execute(task Task)
-
-	// Close 关闭调度器, 停止所有定时器和任务
-	Close()
-
-	// NewTimer 创建一个永久运行的定时器, 每隔 interval 执行一次 fn. 调用 Stop 方法可以停止定时器.
-	NewTimer(interval time.Duration, fn TimerFunc) *Timer
-
-	// NewCountTimer 创建一个执行 count 次的定时器, 每隔 interval 执行一次 fn. 调用 Stop 方法可以停止定时器.
-	NewCountTimer(interval time.Duration, count int, fn TimerFunc) *Timer
-
-	// NewAfterTimer 创建一个执行 1 次的定时器, 等待 duration 后执行 fn. 调用 Stop 方法可以停止定时器.
-	NewAfterTimer(duration time.Duration, fn TimerFunc) *Timer
-
-	// NewCondTimer 创建一个无次数限制的条件定时器, 当 condition 满足时, 执行 fn. 调用 Stop 方法可以停止定时器.
-	NewCondTimer(condition TimerCondition, fn TimerFunc) *Timer
-
-	// NewCondCountTimer 创建一个执行 count 次的条件定时器, 当 condition 满足时, 执行 fn. 调用 Stop 方法可以停止定时器.
-	NewCondCountTimer(condition TimerCondition, count int, fn TimerFunc) *Timer
-}
-
-//====
-
-// 调度器状态常量
-const (
-	created int32 = 0
-	running int32 = 1
-	closed  int32 = 2
 )
 
 // scheduler 调度器
 type scheduler struct {
-	name    string        // 调度器名称
-	state   atomic.Int32  // 调度器状态
-	chDie   chan struct{} // 关闭信号通道
-	chTasks chan Task     // 任务队列
-	tm      timerManager  // 管理所有的定时器
+	name    string                 // 调度器名称
+	tick    time.Duration          // 最小时间粒度
+	state   atomic.Int32           // 调度器状态
+	chDie   chan struct{}          // 关闭信号通道
+	chTasks chan schedulerapi.Task // 任务队列
+	tm      timerManager           // 管理所有的定时器
 }
 
-// NewScheduler 构造一个新的调度器并在子协程启动
-func NewScheduler(name string) Scheduler {
-	return &scheduler{
+// NewScheduler 构造一个新的调度器, 需要调用 Start() 方法来启动调度器.
+func NewScheduler(name string, tick time.Duration) schedulerapi.Scheduler {
+	if tick <= 0 {
+		panic("tick must > 0")
+	}
+	s := &scheduler{
 		name:    name,
+		tick:    tick,
 		chDie:   make(chan struct{}),
-		chTasks: make(chan Task, 1<<8),
+		chTasks: make(chan schedulerapi.Task, 1<<8),
 		tm: timerManager{
-			timers: make(map[int64]*Timer),
+			timers: make(map[int64]*timer),
 		},
 	}
+	return s
 }
 
 // runTask 执行一个任务, 捕获 panic
-func (s *scheduler) runTask(task Task) {
+func (s *scheduler) runTask(task schedulerapi.Task) {
 	if task == nil {
 		return
 	}
@@ -95,16 +51,19 @@ func (s *scheduler) runTask(task Task) {
 }
 
 // runTimerTask 执行一个定时器任务, 捕获 panic
-func (s *scheduler) runTimerTask(id int64, task TimerFunc) {
-	if task == nil {
-		return
-	}
+func (s *scheduler) runTimerTask(id int64, fnTimer schedulerapi.TimerFunc, fnTicker schedulerapi.TickerFunc, now time.Time) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error("Nano scheduler [%v] execute timer-%v error.", s.name, id, routine.NewRuntimeError(err))
 		}
 	}()
-	task()
+	if fnTimer != nil {
+		fnTimer()
+		return
+	}
+	if fnTicker != nil {
+		fnTicker(now)
+	}
 }
 
 // run 调度器的主循环
@@ -113,7 +72,7 @@ func (s *scheduler) run() {
 		log.Info("Nano scheduler [%v] staring.", s.name)
 	}
 
-	ticker := time.NewTicker(env.TimerPrecision)
+	ticker := time.NewTicker(s.tick)
 	defer func() {
 		ticker.Stop()
 		s.tm.close()
@@ -139,7 +98,7 @@ func (s *scheduler) run() {
 
 // Start 启动调度器
 func (s *scheduler) Start() {
-	if !s.state.CompareAndSwap(created, running) {
+	if !s.state.CompareAndSwap(schedulerapi.ExecutorStateCreated, schedulerapi.ExecutorStateRunning) {
 		return
 	}
 
@@ -147,46 +106,81 @@ func (s *scheduler) Start() {
 	go s.run()
 }
 
-// Execute 提交一个任务到调度器
-func (s *scheduler) Execute(task Task) {
-	if s.state.Load() == closed {
-		if env.Debug {
-			log.Info("Nano scheduler [%v] already closed, new tasks are not accepted.", s.name)
-		}
-		return
-	}
-	s.chTasks <- task
-}
-
 // Close 关闭调度器, 停止所有定时器和任务
 func (s *scheduler) Close() {
-	if !s.state.CompareAndSwap(running, closed) {
+	if !s.state.CompareAndSwap(schedulerapi.ExecutorStateRunning, schedulerapi.ExecutorStateClosed) {
 		return
 	}
 	close(s.chDie)
 }
 
+// State 返回调度器的当前状态
+func (s *scheduler) State() schedulerapi.ExecutorState {
+	return s.state.Load()
+}
+
+// Execute 提交一个任务到调度器
+func (s *scheduler) Execute(task schedulerapi.Task) bool {
+	if s.state.Load() == schedulerapi.ExecutorStateClosed {
+		if env.Debug {
+			log.Info("Nano scheduler [%v] already closed, new tasks are not accepted.", s.name)
+		}
+		return false
+	}
+	s.chTasks <- task
+	return true
+}
+
+//====
+
 // NewTimer 创建一个永久运行的定时器, 每隔 interval 执行一次 fn. 调用 Stop 方法可以停止定时器.
-func (s *scheduler) NewTimer(interval time.Duration, fn TimerFunc) *Timer {
+func (s *scheduler) NewTimer(interval time.Duration, fn schedulerapi.TimerFunc) schedulerapi.Timer {
 	return s.tm.newTimer(interval, fn)
 }
 
 // NewCountTimer 创建一个执行 count 次的定时器, 每隔 interval 执行一次 fn. 调用 Stop 方法可以停止定时器.
-func (s *scheduler) NewCountTimer(interval time.Duration, count int, fn TimerFunc) *Timer {
+func (s *scheduler) NewCountTimer(interval time.Duration, count int, fn schedulerapi.TimerFunc) schedulerapi.Timer {
 	return s.tm.newCountTimer(interval, count, fn)
 }
 
 // NewAfterTimer 创建一个执行 1 次的定时器, 等待 duration 后执行 fn. 调用 Stop 方法可以停止定时器.
-func (s *scheduler) NewAfterTimer(duration time.Duration, fn TimerFunc) *Timer {
+func (s *scheduler) NewAfterTimer(duration time.Duration, fn schedulerapi.TimerFunc) schedulerapi.Timer {
 	return s.tm.newAfterTimer(duration, fn)
 }
 
 // NewCondTimer 创建一个无次数限制的条件定时器, 当 condition 满足时, 执行 fn. 调用 Stop 方法可以停止定时器.
-func (s *scheduler) NewCondTimer(condition TimerCondition, fn TimerFunc) *Timer {
+func (s *scheduler) NewCondTimer(condition schedulerapi.TimerCondition, fn schedulerapi.TimerFunc) schedulerapi.Timer {
 	return s.tm.newCondTimer(condition, fn)
 }
 
 // NewCondCountTimer 创建一个执行 count 次的条件定时器, 当 condition 满足时, 执行 fn. 调用 Stop 方法可以停止定时器.
-func (s *scheduler) NewCondCountTimer(condition TimerCondition, count int, fn TimerFunc) *Timer {
+func (s *scheduler) NewCondCountTimer(condition schedulerapi.TimerCondition, count int, fn schedulerapi.TimerFunc) schedulerapi.Timer {
 	return s.tm.newCondCountTimer(condition, count, fn)
+}
+
+//====
+
+// NewTicker 创建一个永久运行的 Ticker, 每隔 interval 往 C 发送一次当前时间. 调用 Stop 方法可以停止 Ticker.
+func (s *scheduler) NewTicker(interval time.Duration) *schedulerapi.Ticker {
+	return s.tm.newTicker(interval)
+}
+
+// NewCountTicker 创建一个执行 count 次的 Ticker, 每隔 interval 往 C 发送一次当前时间. 调用 Stop 方法可以停止 Ticker.
+func (s *scheduler) NewCountTicker(interval time.Duration, count int) *schedulerapi.Ticker {
+	return s.tm.newCountTicker(interval, count)
+}
+
+// NewAfterTicker 创建一个执行 1 次的 Ticker, 等待 duration 后往 C 发送一次当前时间. 调用 Stop 方法可以停止 Ticker.
+func (s *scheduler) NewAfterTicker(duration time.Duration) *schedulerapi.Ticker {
+	return s.tm.newAfterTicker(duration)
+}
+
+// NewCondTicker 创建一个无次数限制的条件 Ticker, 当 condition 满足时, 往 C 发送一次当前时间. 调用 Stop 方法可以停止 Ticker.
+func (s *scheduler) NewCondTicker(condition schedulerapi.TimerCondition) *schedulerapi.Ticker {
+	return s.tm.newCondTicker(condition)
+}
+
+// NewCondCountTicker 创建一个执行 count 次的条件 Ticker, 当 condition 满足时, 往 C 发送一次当前时间. 调用 Stop 方法可以停止 Ticker.
+func (s *scheduler) NewCondCountTicker(condition schedulerapi.TimerCondition, count int) *schedulerapi.Ticker {
+	return s.tm.newCondCountTicker(condition, count)
 }

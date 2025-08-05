@@ -7,25 +7,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lonng/nano/internal/env"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	env.Debug = true
+}
 
 // TestScheduler 测试调度器
 func TestScheduler(t *testing.T) {
 	t.Run("New Scheduler", func(t *testing.T) {
-		s := NewScheduler("test-scheduler").(*scheduler)
+		s := NewScheduler("test-scheduler", time.Millisecond).(*scheduler)
 		s.Start()
 		defer s.Close()
 
 		assert.NotNil(t, s)
 		assert.Equal(t, "test-scheduler", s.name)
 		assert.Eventually(t, func() bool {
-			return s.state.Load() == running
+			return s.State() == schedulerapi.ExecutorStateRunning
 		}, time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("Execute Task", func(t *testing.T) {
-		s := NewScheduler("test")
+		s := NewScheduler("test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -34,7 +40,7 @@ func TestScheduler(t *testing.T) {
 			executed.Store(true)
 		}
 
-		s.Execute(task)
+		assert.True(t, s.Execute(task))
 
 		// 等待任务执行
 		assert.Eventually(t, func() bool {
@@ -43,17 +49,17 @@ func TestScheduler(t *testing.T) {
 	})
 
 	t.Run("Execute Nil Task", func(t *testing.T) {
-		s := NewScheduler("test")
+		s := NewScheduler("test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
 		// 应该不会panic
-		s.Execute(nil)
+		assert.True(t, s.Execute(nil))
 		time.Sleep(50 * time.Millisecond)
 	})
 
 	t.Run("Execute Panic Task", func(t *testing.T) {
-		s := NewScheduler("test")
+		s := NewScheduler("test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -64,7 +70,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		// 应该不会导致调度器崩溃
-		s.Execute(panicTask)
+		assert.True(t, s.Execute(panicTask))
 
 		assert.Eventually(t, func() bool {
 			return executed.Load()
@@ -72,9 +78,9 @@ func TestScheduler(t *testing.T) {
 
 		// 调度器应该仍然可以处理新任务
 		var afterPanicExecuted atomic.Bool
-		s.Execute(func() {
+		assert.True(t, s.Execute(func() {
 			afterPanicExecuted.Store(true)
-		})
+		}))
 
 		assert.Eventually(t, func() bool {
 			return afterPanicExecuted.Load()
@@ -82,25 +88,25 @@ func TestScheduler(t *testing.T) {
 	})
 
 	t.Run("Close Scheduler", func(t *testing.T) {
-		s := NewScheduler("test").(*scheduler)
+		s := NewScheduler("test", time.Millisecond).(*scheduler)
 		s.Close()
-		assert.Equal(t, created, s.state.Load())
+		assert.Equal(t, schedulerapi.ExecutorStateCreated, s.state.Load())
 
 		s.Start()
-		assert.Equal(t, running, s.state.Load())
+		assert.Equal(t, schedulerapi.ExecutorStateRunning, s.state.Load())
 
 		s.Close()
-		assert.Equal(t, closed, s.state.Load())
+		assert.Equal(t, schedulerapi.ExecutorStateClosed, s.state.Load())
 
 		// 重复关闭应该安全
 		s.Close()
-		assert.Equal(t, closed, s.state.Load())
+		assert.Equal(t, schedulerapi.ExecutorStateClosed, s.state.Load())
 	})
 }
 
 // TestScheduler_TimerMethods 测试调度器的定时器方法
 func TestScheduler_TimerMethods(t *testing.T) {
-	s := NewScheduler("test")
+	s := NewScheduler("test", time.Millisecond)
 	s.Start()
 	defer s.Close()
 
@@ -206,10 +212,337 @@ func TestScheduler_TimerMethods(t *testing.T) {
 	})
 }
 
+// TestScheduler_TickerMethods 测试调度器的Ticker方法
+func TestScheduler_TickerMethods(t *testing.T) {
+	s := NewScheduler("test", time.Millisecond)
+	s.Start()
+	defer s.Close()
+
+	t.Run("NewTicker", func(t *testing.T) {
+		ticker := s.NewTicker(50 * time.Millisecond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		// 接收几次tick
+		var received atomic.Int32
+		go func() {
+			for range ticker.C {
+				received.Add(1)
+			}
+		}()
+
+		assert.Eventually(t, func() bool {
+			return received.Load() >= 2
+		}, time.Second, 10*time.Millisecond)
+
+		ticker.Stop()
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCountTicker", func(t *testing.T) {
+		ticker := s.NewCountTicker(20*time.Millisecond, 3)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for range ticker.C {
+				received.Add(1)
+			}
+		}()
+
+		// 等待接收3次
+		assert.Eventually(t, func() bool {
+			return received.Load() == 3
+		}, time.Second, 10*time.Millisecond)
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewAfterTicker", func(t *testing.T) {
+		ticker := s.NewAfterTicker(50 * time.Millisecond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for range ticker.C {
+				received.Add(1)
+			}
+		}()
+
+		// 等待接收1次
+		assert.Eventually(t, func() bool {
+			return received.Load() == 1
+		}, time.Second, 10*time.Millisecond)
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCondTicker", func(t *testing.T) {
+		cond := &testCondition{shouldTrigger: atomic.Bool{}}
+		ticker := s.NewCondTicker(cond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for range ticker.C {
+				received.Add(1)
+			}
+		}()
+
+		// 条件不满足时不接收
+		cond.shouldTrigger.Store(false)
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, int32(0), received.Load())
+
+		// 条件满足时接收
+		cond.shouldTrigger.Store(true)
+		assert.Eventually(t, func() bool {
+			return received.Load() >= 1
+		}, time.Second, 10*time.Millisecond)
+
+		ticker.Stop()
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCondCountTicker", func(t *testing.T) {
+		cond := &testCondition{shouldTrigger: atomic.Bool{}}
+		cond.shouldTrigger.Store(true)
+		ticker := s.NewCondCountTicker(cond, 2)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for range ticker.C {
+				received.Add(1)
+			}
+		}()
+
+		// 等待接收2次
+		assert.Eventually(t, func() bool {
+			return received.Load() == 2
+		}, time.Second, 10*time.Millisecond)
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewTicker_ConsumeSlow", func(t *testing.T) {
+		ticker := s.NewTicker(5 * time.Millisecond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		// 接收几次tick
+		var received atomic.Int32
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					received.Add(1)
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+
+		time.Sleep(200 * time.Millisecond)
+		assert.Equal(t, int32(1), received.Load())
+
+		ticker.Stop()
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCountTicker_ConsumeSlow", func(t *testing.T) {
+		ticker := s.NewCountTicker(5*time.Millisecond, 3)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					received.Add(1)
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+
+		time.Sleep(200 * time.Millisecond)
+		assert.Equal(t, int32(1), received.Load())
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewAfterTicker_ConsumeSlow", func(t *testing.T) {
+		ticker := s.NewAfterTicker(50 * time.Millisecond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					received.Add(1)
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+
+		// 等待接收1次
+		time.Sleep(200 * time.Millisecond)
+		assert.Equal(t, int32(1), received.Load())
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCondTicker_ConsumeSlow", func(t *testing.T) {
+		cond := &testCondition{shouldTrigger: atomic.Bool{}}
+		ticker := s.NewCondTicker(cond)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					received.Add(1)
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+
+		// 条件不满足时不接收
+		cond.shouldTrigger.Store(false)
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, int32(0), received.Load())
+
+		// 条件满足时接收
+		cond.shouldTrigger.Store(true)
+		time.Sleep(200 * time.Millisecond)
+		assert.Equal(t, int32(1), received.Load())
+
+		ticker.Stop()
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("NewCondCountTicker_ConsumeSlow", func(t *testing.T) {
+		cond := &testCondition{shouldTrigger: atomic.Bool{}}
+		cond.shouldTrigger.Store(true)
+		ticker := s.NewCondCountTicker(cond, 2)
+		assert.NotNil(t, ticker)
+		assert.NotNil(t, ticker.C)
+
+		var received atomic.Int32
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					received.Add(1)
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+
+		// 等待接收2次
+		time.Sleep(200 * time.Millisecond)
+		assert.Equal(t, int32(1), received.Load())
+
+		// 验证channel被关闭
+		assert.Eventually(t, func() bool {
+			select {
+			case _, ok := <-ticker.C:
+				return !ok // 如果 channel 已关闭，则 ok == false
+			default:
+				return false // 没有关闭，但也没有值可读
+			}
+		}, 2*time.Second, 10*time.Millisecond)
+	})
+}
+
 // TestScheduler_Integration 集成测试
 func TestScheduler_Integration(t *testing.T) {
 	t.Run("Mixed Tasks and Timers", func(t *testing.T) {
-		s := NewScheduler("integration-test")
+		s := NewScheduler("integration-test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -218,9 +551,9 @@ func TestScheduler_Integration(t *testing.T) {
 
 		// 添加普通任务
 		for i := 0; i < 10; i++ {
-			s.Execute(func() {
+			assert.True(t, s.Execute(func() {
 				taskCount.Add(1)
-			})
+			}))
 		}
 
 		// 添加定时器
@@ -237,7 +570,7 @@ func TestScheduler_Integration(t *testing.T) {
 	})
 
 	t.Run("High Concurrency Stress Test", func(t *testing.T) {
-		s := NewScheduler("stress-test")
+		s := NewScheduler("stress-test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -253,16 +586,16 @@ func TestScheduler_Integration(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for j := 0; j < numTasksPerGoroutine; j++ {
-					s.Execute(func() {
+					assert.True(t, s.Execute(func() {
 						totalExecuted.Add(1)
-					})
+					}))
 				}
 			}()
 		}
 
 		// 同时创建定时器
 		var timerExecuted atomic.Int32
-		timers := make([]*Timer, 20)
+		timers := make([]schedulerapi.Timer, 20)
 		for i := 0; i < 20; i++ {
 			timers[i] = s.NewCountTimer(10*time.Millisecond, 1, func() {
 				timerExecuted.Add(1)
@@ -285,8 +618,14 @@ func TestScheduler_Integration(t *testing.T) {
 
 // TestScheduler_EdgeCases 边界测试
 func TestScheduler_EdgeCases(t *testing.T) {
+	t.Run("NewScheduler with zero tick", func(t *testing.T) {
+		assert.Panics(t, func() {
+			NewScheduler("test", 0)
+		})
+	})
+
 	t.Run("Scheduler start twice", func(t *testing.T) {
-		s := NewScheduler("edge-test").(*scheduler)
+		s := NewScheduler("edge-test", time.Millisecond).(*scheduler)
 		s.Start()
 		defer s.Close()
 
@@ -299,13 +638,13 @@ func TestScheduler_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Scheduler execute after closed", func(t *testing.T) {
-		s := NewScheduler("edge-test")
+		s := NewScheduler("edge-test", time.Millisecond)
 		s.Start()
 
 		var taskCount atomic.Int32
-		s.Execute(func() {
+		assert.True(t, s.Execute(func() {
 			taskCount.Add(1)
-		})
+		}))
 		assert.Eventually(t, func() bool {
 			return taskCount.Load() == 1
 		}, 5*time.Second, 1*time.Millisecond)
@@ -313,15 +652,15 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		s.Close()
 
 		// 再次调度任务，应该不会panic, 并且不会执行
-		s.Execute(func() {
+		assert.False(t, s.Execute(func() {
 			taskCount.Add(1)
-		})
+		}))
 		time.Sleep(5 * time.Millisecond)
 		assert.Equal(t, int32(1), taskCount.Load())
 	})
 
 	t.Run("Timer With Very Short Interval", func(t *testing.T) {
-		s := NewScheduler("edge-test")
+		s := NewScheduler("edge-test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -338,7 +677,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Timer With Very Long Interval", func(t *testing.T) {
-		s := NewScheduler("edge-test")
+		s := NewScheduler("edge-test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -355,7 +694,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Stop Timer Immediately After Creation", func(t *testing.T) {
-		s := NewScheduler("edge-test")
+		s := NewScheduler("edge-test", time.Millisecond)
 		s.Start()
 		defer s.Close()
 
@@ -372,8 +711,8 @@ func TestScheduler_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Multiple Schedulers", func(t *testing.T) {
-		s1 := NewScheduler("test1")
-		s2 := NewScheduler("test2")
+		s1 := NewScheduler("test1", time.Millisecond)
+		s2 := NewScheduler("test2", time.Millisecond)
 		s1.Start()
 		s2.Start()
 		defer s1.Close()
@@ -381,8 +720,8 @@ func TestScheduler_EdgeCases(t *testing.T) {
 
 		var count1, count2 atomic.Int32
 
-		s1.Execute(func() { count1.Add(1) })
-		s2.Execute(func() { count2.Add(1) })
+		assert.True(t, s1.Execute(func() { count1.Add(1) }))
+		assert.True(t, s2.Execute(func() { count2.Add(1) }))
 
 		assert.Eventually(t, func() bool {
 			return count1.Load() == 1 && count2.Load() == 1
@@ -392,7 +731,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 
 // TestTimerPanicHandling 测试定时器panic处理
 func TestTimerPanicHandling(t *testing.T) {
-	s := NewScheduler("panic-test")
+	s := NewScheduler("panic-test", time.Millisecond)
 	s.Start()
 	defer s.Close()
 
@@ -419,7 +758,7 @@ func TestTimerPanicHandling(t *testing.T) {
 
 // BenchmarkScheduler 性能测试
 func BenchmarkScheduler(b *testing.B) {
-	s := NewScheduler("benchmark")
+	s := NewScheduler("benchmark", time.Millisecond)
 	s.Start()
 	defer s.Close()
 
@@ -429,9 +768,9 @@ func BenchmarkScheduler(b *testing.B) {
 		b.ResetTimer()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				s.Execute(func() {
+				assert.True(b, s.Execute(func() {
 					counter.Add(1)
-				})
+				}))
 			}
 		})
 	})
