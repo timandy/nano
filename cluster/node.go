@@ -90,17 +90,17 @@ func NewNode(engine npi.Engine, opts *Options) *Node {
 		sessions: map[int64]*session.Session{},
 	}
 
-	//创建处理器, 并执行扫描
+	//创建处理器
 	n.cluster = newCluster(n) //master 和 member 都需要初始化该实例, 用来管理远程节点
 	n.handler = newHandler(n)
+
+	//注册服务, 扫描方法
 	components := n.opts.Components.List()
-	if n.opts.AutoScan {
-		for _, c := range components {
-			//扫描
-			err := n.handler.scan(c.Comp, c.Opts)
-			if err != nil {
-				log.Fatal("Scan component %s failed.", reflect.TypeOf(c.Comp).String(), err)
-			}
+	scan := n.opts.AutoScan
+	for _, c := range components {
+		err := n.handler.scan(c.Comp, c.Opts, scan)
+		if err != nil {
+			log.Fatal("Scan component %s failed.", reflect.TypeOf(c.Comp).String(), err)
 		}
 	}
 

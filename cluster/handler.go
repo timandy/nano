@@ -95,19 +95,26 @@ func getAllNoRoutes(engine npi.Engine) *npi.HandlerNode {
 	return npi.NewHandlerNode(engine.AllNoRoutes()...)
 }
 
-func (h *LocalHandler) scan(comp component.Component, opts []component.Option) error {
+func (h *LocalHandler) scan(comp component.Component, opts []component.Option, scan bool) error {
 	s := component.NewService(comp, opts)
 
+	// 注册服务
 	if _, ok := h.localServices[s.Name]; ok {
 		return fmt.Errorf("handler: service already defined: %s", s.Name)
 	}
+	h.localServices[s.Name] = s
 
+	// 禁用了自动扫描, 只注册服务, 不扫描方法
+	if !scan {
+		return nil
+	}
+
+	// 扫描方法
 	if err := s.ExtractHandler(); err != nil {
 		return err
 	}
 
-	// register all localHandlers
-	h.localServices[s.Name] = s
+	// 注册到路由树
 	for name, handler := range s.Handlers {
 		route := fmt.Sprintf("%s.%s", s.Name, name)
 		log.Info("Register local handler", route)
