@@ -126,12 +126,10 @@ go mod tidy
 
 ```bash
 # protoc
-# download form: https://github.com/protocolbuffers/protobuf/releases
+# download form: https://github.com/protocolbuffers/protobuf/releases/tag/v31.1
 # protoc-gen-go
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-# delve
-go install github.com/go-delve/delve/cmd/dlv@latest
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 ```
 
 ## Test
@@ -145,10 +143,10 @@ go test -v ./...
 ```bash
 # Case:   PingPong
 # OS:     Windows 10
-# Device: i5-6500 3.2GHz 4 Core/1000-Concurrent   => IOPS 11W(Average)
+# Device: i5-6500 3.2GHz 4 Core/1000-Concurrent => IOPS 11W(Average)
 # Other:  ...
 
-cd ./benchmark/io
+cd ./test/benchmark/io
 go test -v -tags "benchmark"
 ```
 
