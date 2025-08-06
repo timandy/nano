@@ -47,17 +47,25 @@ func NewService(comp Component, opts []Option) *Service {
 		Receiver: reflect.ValueOf(comp),
 	}
 
-	// apply options
+	// 合并设置
 	for i := range opts {
 		opt := opts[i]
 		opt(&s.Options)
 	}
-	if name := s.Options.name; name != "" {
-		s.Name = name
-	} else {
-		s.Name = reflect.Indirect(s.Receiver).Type().Name()
+
+	// 组件名称
+	name := s.Options.name
+	if name == "" {
+		name = reflect.Indirect(s.Receiver).Type().Name()
 	}
-	s.Executor = s.Options.executor
+	s.Name = name
+
+	// 组件执行器
+	executor := s.Options.executor
+	if executor != nil {
+		executor.Start() // 启动执行器, 执行器的启动操作必须幂等, 防止重复启动
+	}
+	s.Executor = executor
 
 	return s
 }
