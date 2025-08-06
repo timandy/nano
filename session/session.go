@@ -474,8 +474,8 @@ func (s *Session) Execute(task func(), executorFactory ...func() schedulerapi.Ex
 
 // getExecutor 获取当前会话的执行器
 func (s *Session) getExecutor() schedulerapi.Executor {
-	s.dataMu.RLock()
-	defer s.dataMu.RUnlock()
+	s.executorMu.RLock()
+	defer s.executorMu.RUnlock()
 
 	return s.executor
 }
