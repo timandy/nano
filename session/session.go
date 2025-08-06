@@ -461,11 +461,8 @@ func (s *Session) Execute(task func(), executorFactory ...func() schedulerapi.Ex
 			continue
 		}
 		executor = fac()
-		if executor == nil {
-			continue
-		}
-		if !executor.Execute(task) {
-			continue
+		if executor != nil && executor.Execute(task) {
+			return
 		}
 	}
 	// 全局级别执行器
