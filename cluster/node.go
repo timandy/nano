@@ -234,11 +234,6 @@ func (n *Node) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	n.handler.handleWS(conn)
 }
 
-// StoreSession 存储 Session, 如果存在则覆盖
-func (n *Node) storeSession(s *session.Session) {
-	n.saveSession(s.ID(), s)
-}
-
 // findOrCreateSession 查找或创建 Session
 func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session, error) {
 	s, found := n.findSession(sid)
@@ -247,7 +242,7 @@ func (n *Node) findOrCreateSession(sid int64, gateAddr string) (*session.Session
 		if err != nil {
 			return nil, err
 		}
-		ac := newAcceptor(sid, clusterpb.NewGateClient(conns.Get()), n.handler.remoteProcess, gateAddr)
+		ac := newAcceptor(sid, n, clusterpb.NewGateClient(conns.Get()), n.handler.remoteProcess, gateAddr)
 		s = session.New(ac)
 		ac.session = s
 		n.saveSession(sid, s)

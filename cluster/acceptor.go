@@ -15,6 +15,7 @@ var _ session.NetworkEntity = (*acceptor)(nil)
 
 type acceptor struct {
 	sid        int64
+	node       *Node
 	gateClient clusterpb.GateClient
 	session    *session.Session
 	lastMid    uint64
@@ -23,9 +24,10 @@ type acceptor struct {
 }
 
 // 集群模式中, 工作节点的网络对象
-func newAcceptor(sid int64, gateClient clusterpb.GateClient, rpcHandler rpcHandler, gateAddr string) *acceptor {
+func newAcceptor(sid int64, node *Node, gateClient clusterpb.GateClient, rpcHandler rpcHandler, gateAddr string) *acceptor {
 	return &acceptor{
 		sid:        sid,
+		node:       node,
 		gateClient: gateClient,
 		rpcHandler: rpcHandler,
 		gateAddr:   gateAddr,
@@ -90,13 +92,20 @@ func (a *acceptor) ResponseMid(mid uint64, v any) error {
 	return err
 }
 
-// Close implements the session.NetworkEntity interface
+// Close 集群模式下, Worker 节点关闭会话, 通知 Gate 也关闭(主动关闭)
 func (a *acceptor) Close() error {
 	// TODO: buffer
+	// 先删除
+	s, found := a.node.delSession(a.sid)
+	// 通知 gate
 	request := &clusterpb.CloseSessionRequest{
 		SessionId: a.sid,
 	}
 	_, err := a.gateClient.CloseSession(context.Background(), request)
+	// 触发事件
+	if found {
+		s.Execute(func() { session.Event.FireSessionClosed(s) }) //异步执行关闭事件
+	}
 	return err
 }
 

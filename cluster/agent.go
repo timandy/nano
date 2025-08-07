@@ -203,8 +203,6 @@ func (a *agent) Close() error {
 		// expect
 	default:
 		close(a.chDie)
-		s := a.session
-		s.Execute(func() { session.Event.FireSessionClosed(s) })
 	}
 
 	return a.conn.Close()

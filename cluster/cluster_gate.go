@@ -34,11 +34,11 @@ func (g gate) HandleResponse(_ context.Context, req *clusterpb.ResponseMessage) 
 	return &clusterpb.GateHandleResponse{}, s.ResponseMID(req.Id, req.Data)
 }
 
-// CloseSession 作为 Gateway 时, 处理业务节点关闭 Session 的请求
+// CloseSession 作为 Gate 时, 处理业务节点关闭 Session 的请求
 func (g gate) CloseSession(_ context.Context, req *clusterpb.CloseSessionRequest) (*clusterpb.CloseSessionResponse, error) {
-	s, found := g.node.delSession(req.SessionId)
+	s, found := g.node.findSession(req.SessionId)
 	if found {
-		s.Close()
+		s.Close() // agent 的 read 协程退出时, 会将 session 从 node 中删除并触发事件
 	}
 	return &clusterpb.CloseSessionResponse{}, nil
 }

@@ -196,7 +196,12 @@ func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 func (h *LocalHandler) handle(conn net.Conn) {
 	// create a client agent and startup write gorontine
 	agent := newAgent(conn, h.pipeline, h.remoteProcess)
-	h.node.storeSession(agent.session)
+	s := agent.session
+	h.node.saveSession(s.ID(), s)
+	defer func() {
+		h.node.delSession(s.ID())                                //防止 session 泄露
+		s.Execute(func() { session.Event.FireSessionClosed(s) }) //异步执行关闭事件
+	}()
 
 	// startup write goroutine
 	go agent.write()
@@ -207,9 +212,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 
 	// guarantee agent related resource be destroyed
 	defer func() {
-		request := &clusterpb.SessionClosedRequest{
-			SessionId: agent.session.ID(),
-		}
+		request := &clusterpb.SessionClosedRequest{SessionId: s.ID()}
 
 		members := h.node.cluster.remoteAddrs()
 		for _, remote := range members {
@@ -232,7 +235,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 
 		_ = agent.Close()
 		if env.Debug {
-			log.Info("Session read goroutine exit, SessionID=%d, UID=%d", agent.session.ID(), agent.session.UID())
+			log.Info("Session read goroutine exit, SessionID=%d, UID=%d", s.ID(), s.UID())
 		}
 	}()
 

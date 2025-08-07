@@ -57,11 +57,13 @@ func (w worker) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*
 	return &clusterpb.MemberHandleResponse{}, nil
 }
 
-// SessionClosed 作为业务节点时, 处理 Gateway Session 已关闭的事件
+// SessionClosed 集群模式中, 作为 Worker 时, 处理 Gate 发来的 Session 已关闭的事件(被动关闭)
 func (w worker) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
+	// Worker 主动关闭时, 通知 Gate, 然后 Gate 会再次通知 Worker, 但此时 session 已经被删除 found==false, 不会触发事件(主动删除的时候已经触发了)
 	s, found := w.node.delSession(req.SessionId)
 	if found {
-		s.Execute(func() { session.Event.FireSessionClosed(s) })
+		s.Execute(func() { session.Event.FireSessionClosed(s) }) //异步执行关闭事件
 	}
+	// 注意不要调用 s.Close() 会造成再次通知 Gate
 	return &clusterpb.SessionClosedResponse{}, nil
 }
