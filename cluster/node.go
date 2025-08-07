@@ -224,6 +224,13 @@ func (n *Node) Handler() *LocalHandler {
 	return n.handler
 }
 
+// SessionCount 返回当前节点的会话数量
+func (n *Node) SessionCount() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return len(n.sessions)
+}
+
 // ServeHttp 处理 HTTP 请求, 主要用于 WebSocket 升级
 func (n *Node) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := n.upgrader.Upgrade(w, r, nil)

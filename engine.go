@@ -122,6 +122,15 @@ func (engine *Engine) Register(component component.Component, options ...compone
 	engine.opts.Components.Register(component, options...)
 }
 
+// SessionCount 获取当前会话数量
+func (engine *Engine) SessionCount() int {
+	node := engine.node
+	if node == nil {
+		return 0
+	}
+	return node.SessionCount()
+}
+
 // Startup 启动引擎
 func (engine *Engine) Startup() error {
 	if !engine.running.CompareAndSwap(false, true) {
