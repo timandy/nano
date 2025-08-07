@@ -22,6 +22,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -312,6 +313,8 @@ func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 
 	case packet.Heartbeat:
 		// expected
+	default:
+		return errors.New("invalid packet type")
 	}
 
 	agent.lastAt = time.Now().Unix()
