@@ -106,6 +106,13 @@ func (c *Context) Abort() {
 	c.index = abortIndex
 }
 
+// AbortWithPush 推送消息并终止
+func (c *Context) AbortWithPush(route string, v any) error {
+	err := c.Session.Push(route, v)
+	c.Abort()
+	return err
+}
+
 // AbortWithResponse 返回响应并终止
 func (c *Context) AbortWithResponse(v any) error {
 	err := c.Session.ResponseMID(c.Mid, v)
@@ -119,6 +126,11 @@ func (c *Context) AbortWithError(err error) {
 	c.Error(err)
 }
 
+// Push 推送消息
+func (c *Context) Push(route string, v any) error {
+	return c.Session.Push(route, v)
+}
+
 // Response 返回响应
 func (c *Context) Response(v any) error {
 	return c.Session.ResponseMID(c.Mid, v)
@@ -127,4 +139,9 @@ func (c *Context) Response(v any) error {
 // ShouldBind 解析并验证数据
 func (c *Context) ShouldBind(obj any) error {
 	return binding.ShouldBind(c.Msg, obj)
+}
+
+// CloseSession 关闭会话
+func (c *Context) CloseSession() {
+	c.Session.Close()
 }
