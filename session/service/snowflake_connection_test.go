@@ -2,30 +2,28 @@ package service
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewDefaultConnectionServer(t *testing.T) {
 	service := newSnowflakeConnection()
-	w := make(chan bool, paraCount)
 	sidChan := make(chan int64, paraCount)
+	defer close(sidChan)
+	// gen id
 	for i := 0; i < paraCount; i++ {
 		go func() {
-			service.Increment()
-			w <- true
 			sidChan <- service.SessionID()
 		}()
 	}
-	smap := make(map[int64]struct{}, paraCount)
+	// predicate
+	mp := make(map[int64]struct{}, paraCount)
 	for i := 0; i < paraCount; i++ {
-		<-w
 		sid := <-sidChan
-		if _, ok := smap[sid]; ok {
-			t.Error("wrong session id repeat")
+		if _, ok := mp[sid]; ok {
+			assert.Fail(t, "duplicate session id")
 		} else {
-			smap[sid] = struct{}{}
+			mp[sid] = struct{}{}
 		}
-	}
-	if service.Count() != paraCount {
-		t.Error("wrong connection count")
 	}
 }

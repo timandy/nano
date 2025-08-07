@@ -2,30 +2,25 @@ package service
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const paraCount = 500000
 
 func TestNewConnectionService(t *testing.T) {
 	service := newCounterConnection()
-	w := make(chan bool, paraCount)
+	sidChan := make(chan int64, paraCount)
+	defer close(sidChan)
+	// gen id
 	for i := 0; i < paraCount; i++ {
 		go func() {
-			service.Increment()
-			service.SessionID()
-			w <- true
+			sidChan <- service.SessionID()
 		}()
 	}
-
+	// predicate
 	for i := 0; i < paraCount; i++ {
-		<-w
+		<-sidChan
 	}
-
-	if service.Count() != paraCount {
-		t.Error("wrong connection count")
-	}
-
-	if service.SessionID() != paraCount+1 {
-		t.Error("wrong session id")
-	}
+	assert.EqualValues(t, paraCount+1, service.SessionID())
 }
