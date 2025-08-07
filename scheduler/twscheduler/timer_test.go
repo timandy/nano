@@ -13,88 +13,88 @@ import (
 // TestTimer_BasicFunctionality 测试Timer基本功能
 func TestTimer_BasicFunctionality(t *testing.T) {
 	t.Run("Timer ID", func(t *testing.T) {
-		timer := newTimer(123, time.Second, func() {})
-		assert.Equal(t, int64(123), timer.ID())
+		tmr := newTimer(123, time.Second, func() {})
+		assert.Equal(t, int64(123), tmr.ID())
 	})
 
 	t.Run("Timer Stop", func(t *testing.T) {
-		timer := newTimer(1, time.Second, func() {})
-		assert.False(t, timer.Stopped())
+		tmr := newTimer(1, time.Second, func() {})
+		assert.False(t, tmr.Stopped())
 
-		timer.Stop()
-		assert.True(t, timer.Stopped())
+		tmr.Stop()
+		assert.True(t, tmr.Stopped())
 
 		// 重复停止应该安全
-		timer.Stop()
-		assert.True(t, timer.Stopped())
+		tmr.Stop()
+		assert.True(t, tmr.Stopped())
 	})
 
 	t.Run("Timer Countdown", func(t *testing.T) {
-		timer := newCountTimer(1, time.Second, 3, func() {})
-		assert.False(t, timer.Stopped())
+		tmr := newCountTimer(1, time.Second, 3, func() {})
+		assert.False(t, tmr.Stopped())
 
-		timer.countdown()
-		assert.False(t, timer.Stopped())
+		tmr.countdown()
+		assert.False(t, tmr.Stopped())
 
-		timer.countdown()
-		assert.False(t, timer.Stopped())
+		tmr.countdown()
+		assert.False(t, tmr.Stopped())
 
-		timer.countdown()
-		assert.True(t, timer.Stopped())
+		tmr.countdown()
+		assert.True(t, tmr.Stopped())
 	})
 
 	t.Run("Infinite Timer Countdown", func(t *testing.T) {
-		timer := newTimer(1, time.Second, func() {})
+		tmr := newTimer(1, time.Second, func() {})
 		for i := 0; i < 1000; i++ {
-			timer.countdown()
+			tmr.countdown()
 		}
-		assert.False(t, timer.Stopped())
+		assert.False(t, tmr.Stopped())
 	})
 }
 
 // TestTimer_Unlink 测试定时器从槽中移除功能
 func TestTimer_Unlink(t *testing.T) {
 	t.Run("Unlink from empty slot", func(t *testing.T) {
-		timer := newTimer(1, time.Second, func() {})
-		timer.unlink() // 不应该panic
-		assert.Nil(t, timer.slot)
-		assert.Nil(t, timer.prev)
-		assert.Nil(t, timer.next)
+		tmr := newTimer(1, time.Second, func() {})
+		tmr.unlink() // 不应该panic
+		assert.Nil(t, tmr.slot)
+		assert.Nil(t, tmr.prev)
+		assert.Nil(t, tmr.next)
 	})
 
 	t.Run("Unlink from single timer slot", func(t *testing.T) {
-		slot := &slot{}
-		timer := newTimer(1, time.Second, func() {})
+		slt := &slot{}
+		tmr := newTimer(1, time.Second, func() {})
 
 		// 手动链接到槽
-		timer.slot = slot
-		timer.next = nil
-		timer.prev = nil
-		slot.head = timer
+		tmr.slot = slt
+		tmr.next = nil
+		tmr.prev = nil
+		slt.head = tmr
 
-		timer.unlink()
-		assert.Nil(t, slot.head)
-		assert.Nil(t, timer.slot)
-		assert.Nil(t, timer.prev)
-		assert.Nil(t, timer.next)
+		tmr.unlink()
+		assert.Nil(t, slt.head)
+		assert.Nil(t, tmr.slot)
+		assert.Nil(t, tmr.prev)
+		assert.Nil(t, tmr.next)
 	})
 
 	t.Run("Unlink from head of multiple timers", func(t *testing.T) {
-		slot := &slot{}
+		slt := &slot{}
 		timer1 := newTimer(1, time.Second, func() {})
 		timer2 := newTimer(2, time.Second, func() {})
 
 		// 构建链表: timer1 -> timer2
-		timer1.slot = slot
+		timer1.slot = slt
 		timer1.next = timer2
 		timer1.prev = nil
-		timer2.slot = slot
+		timer2.slot = slt
 		timer2.next = nil
 		timer2.prev = timer1
-		slot.head = timer1
+		slt.head = timer1
 
 		timer1.unlink()
-		assert.Equal(t, timer2, slot.head)
+		assert.Equal(t, timer2, slt.head)
 		assert.Nil(t, timer2.prev)
 		assert.Nil(t, timer1.slot)
 		assert.Nil(t, timer1.prev)
@@ -102,25 +102,25 @@ func TestTimer_Unlink(t *testing.T) {
 	})
 
 	t.Run("Unlink from middle of multiple timers", func(t *testing.T) {
-		slot := &slot{}
+		slt := &slot{}
 		timer1 := newTimer(1, time.Second, func() {})
 		timer2 := newTimer(2, time.Second, func() {})
 		timer3 := newTimer(3, time.Second, func() {})
 
 		// 构建链表: timer1 -> timer2 -> timer3
-		timer1.slot = slot
+		timer1.slot = slt
 		timer1.next = timer2
 		timer1.prev = nil
-		timer2.slot = slot
+		timer2.slot = slt
 		timer2.next = timer3
 		timer2.prev = timer1
-		timer3.slot = slot
+		timer3.slot = slt
 		timer3.next = nil
 		timer3.prev = timer2
-		slot.head = timer1
+		slt.head = timer1
 
 		timer2.unlink()
-		assert.Equal(t, timer1, slot.head)
+		assert.Equal(t, timer1, slt.head)
 		assert.Equal(t, timer3, timer1.next)
 		assert.Equal(t, timer1, timer3.prev)
 		assert.Nil(t, timer2.slot)
@@ -129,21 +129,21 @@ func TestTimer_Unlink(t *testing.T) {
 	})
 
 	t.Run("Unlink from tail of multiple timers", func(t *testing.T) {
-		slot := &slot{}
+		slt := &slot{}
 		timer1 := newTimer(1, time.Second, func() {})
 		timer2 := newTimer(2, time.Second, func() {})
 
 		// 构建链表: timer1 -> timer2
-		timer1.slot = slot
+		timer1.slot = slt
 		timer1.next = timer2
 		timer1.prev = nil
-		timer2.slot = slot
+		timer2.slot = slt
 		timer2.next = nil
 		timer2.prev = timer1
-		slot.head = timer1
+		slt.head = timer1
 
 		timer2.unlink()
-		assert.Equal(t, timer1, slot.head)
+		assert.Equal(t, timer1, slt.head)
 		assert.Nil(t, timer1.next)
 		assert.Nil(t, timer2.slot)
 		assert.Nil(t, timer2.prev)
@@ -158,7 +158,7 @@ func TestTimer_Execution(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newTimer(1, 50*time.Millisecond, func() {
+		tmr := newTimer(1, 50*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
@@ -166,13 +166,13 @@ func TestTimer_Execution(t *testing.T) {
 		ts := now.UnixNano()
 
 		// 刚创建时不应该执行
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		assert.Equal(t, int32(0), execCount.Load())
 
 		// 间隔时间后应该执行
 		futureTime := now.Add(100 * time.Millisecond)
 		futureTs := futureTime.UnixNano()
-		timer.exec(s, futureTime, futureTs)
+		tmr.exec(s, futureTime, futureTs)
 		time.Sleep(10 * time.Millisecond) // 等待任务执行
 		assert.Equal(t, int32(1), execCount.Load())
 	})
@@ -182,14 +182,14 @@ func TestTimer_Execution(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newTimer(1, 10*time.Millisecond, func() {
+		tmr := newTimer(1, 10*time.Millisecond, func() {
 			execCount.Add(1)
 		})
-		timer.Stop()
+		tmr.Stop()
 
 		futureTime := time.Now().Add(100 * time.Millisecond)
 		futureTs := futureTime.UnixNano()
-		timer.exec(s, futureTime, futureTs)
+		tmr.exec(s, futureTime, futureTs)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(0), execCount.Load())
 	})
@@ -199,7 +199,7 @@ func TestTimer_Execution(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newAfterTimer(1, 10*time.Millisecond, func() {
+		tmr := newAfterTimer(1, 10*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
@@ -208,12 +208,12 @@ func TestTimer_Execution(t *testing.T) {
 		// 应该执行一次
 		futureTime := now.Add(100 * time.Millisecond)
 		futureTs := futureTime.UnixNano()
-		timer.exec(s, futureTime, futureTs)
+		tmr.exec(s, futureTime, futureTs)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(1), execCount.Load())
 
 		// 再次执行不应该触发（计数器为0）
-		timer.exec(s, futureTime, futureTs)
+		tmr.exec(s, futureTime, futureTs)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(1), execCount.Load())
 	})
@@ -222,28 +222,28 @@ func TestTimer_Execution(t *testing.T) {
 // TestTimer_CreateTimer 测试createTimer函数的所有分支
 func TestTimer_CreateTimer(t *testing.T) {
 	t.Run("Create Timer With Count", func(t *testing.T) {
-		timer := createTimer(1, func() {}, time.Second, nil, 5)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, int64(5), timer.counter.Load())
-		assert.Greater(t, timer.when-time.Now().UnixNano(), int64(time.Second-2*time.Millisecond))
+		tmr := createTimer(1, func() {}, time.Second, nil, 5)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, int64(5), tmr.counter.Load())
+		assert.Greater(t, tmr.when-time.Now().UnixNano(), int64(time.Second-2*time.Millisecond))
 	})
 
 	t.Run("Create Timer With Condition", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := createTimer(2, func() {}, time.Hour, cond, schedulerapi.Infinite)
-		assert.Equal(t, int64(2), timer.id)
-		assert.EqualValues(t, int64(time.Hour), timer.interval)
-		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
-		assert.Greater(t, timer.when-time.Now().UnixNano(), int64(time.Hour-time.Second))
+		tmr := createTimer(2, func() {}, time.Hour, cond, schedulerapi.Infinite)
+		assert.Equal(t, int64(2), tmr.id)
+		assert.EqualValues(t, int64(time.Hour), tmr.interval)
+		assert.Equal(t, cond, tmr.condition)
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
+		assert.Greater(t, tmr.when-time.Now().UnixNano(), int64(time.Hour-time.Second))
 	})
 
 	t.Run("Create Timer With Zero Count", func(t *testing.T) {
-		timer := createTimer(3, func() {}, time.Second, nil, 0)
-		assert.Equal(t, int64(0), timer.counter.Load())
-		assert.True(t, timer.Stopped())
+		tmr := createTimer(3, func() {}, time.Second, nil, 0)
+		assert.Equal(t, int64(0), tmr.counter.Load())
+		assert.True(t, tmr.Stopped())
 	})
 }
 
@@ -256,7 +256,7 @@ func TestTimer_ConditionTimer(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newCondTimer(1, cond, func() {
+		tmr := newCondTimer(1, cond, func() {
 			execCount.Add(1)
 		})
 
@@ -265,13 +265,13 @@ func TestTimer_ConditionTimer(t *testing.T) {
 
 		// 条件不满足时不执行
 		cond.shouldTrigger.Store(false)
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(0), execCount.Load())
 
 		// 条件满足时执行
 		cond.shouldTrigger.Store(true)
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(1), execCount.Load())
 	})
@@ -281,7 +281,7 @@ func TestTimer_ConditionTimer(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newCondCountTimer(1, cond, 2, func() {
+		tmr := newCondCountTimer(1, cond, 2, func() {
 			execCount.Add(1)
 		})
 
@@ -291,19 +291,19 @@ func TestTimer_ConditionTimer(t *testing.T) {
 		cond.shouldTrigger.Store(true)
 
 		// 第一次执行
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(1), execCount.Load())
-		assert.False(t, timer.Stopped())
+		assert.False(t, tmr.Stopped())
 
 		// 第二次执行
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(2), execCount.Load())
-		assert.True(t, timer.Stopped())
+		assert.True(t, tmr.Stopped())
 
 		// 第三次不应该执行
-		timer.exec(s, now, ts)
+		tmr.exec(s, now, ts)
 		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, int32(2), execCount.Load())
 	})
@@ -312,17 +312,17 @@ func TestTimer_ConditionTimer(t *testing.T) {
 // TestTimer_Clean 测试清理函数
 func TestTimer_Clean(t *testing.T) {
 	t.Run("Clean with nil function", func(t *testing.T) {
-		timer := newTimer(1, time.Second, func() {})
-		timer.clean() // 不应该panic
+		tmr := newTimer(1, time.Second, func() {})
+		tmr.clean() // 不应该panic
 	})
 
 	t.Run("Clean with function", func(t *testing.T) {
 		var cleaned atomic.Bool
-		timer := createTimer(1, func() {}, time.Second, nil, 1)
-		timer.fnClean = func() {
+		tmr := createTimer(1, func() {}, time.Second, nil, 1)
+		tmr.fnClean = func() {
 			cleaned.Store(true)
 		}
-		timer.clean()
+		tmr.clean()
 		assert.True(t, cleaned.Load())
 	})
 }
@@ -330,94 +330,94 @@ func TestTimer_Clean(t *testing.T) {
 // TestTimer_Constructors 测试所有构造函数
 func TestTimer_Constructors(t *testing.T) {
 	t.Run("newTimer", func(t *testing.T) {
-		timer := newTimer(1, time.Second, func() {})
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr := newTimer(1, time.Second, func() {})
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 	})
 
 	t.Run("newCountTimer", func(t *testing.T) {
-		timer := newCountTimer(1, time.Second, 5, func() {})
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, int64(5), timer.counter.Load())
+		tmr := newCountTimer(1, time.Second, 5, func() {})
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, int64(5), tmr.counter.Load())
 	})
 
 	t.Run("newAfterTimer", func(t *testing.T) {
-		timer := newAfterTimer(1, time.Second, func() {})
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, int64(1), timer.counter.Load())
+		tmr := newAfterTimer(1, time.Second, func() {})
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, int64(1), tmr.counter.Load())
 	})
 
 	t.Run("newCondTimer", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := newCondTimer(1, cond, func() {})
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(math.MaxInt64), timer.interval)
-		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr := newCondTimer(1, cond, func() {})
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(math.MaxInt64), tmr.interval)
+		assert.Equal(t, cond, tmr.condition)
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 	})
 
 	t.Run("newCondCountTimer", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := newCondCountTimer(1, cond, 3, func() {})
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(math.MaxInt64), timer.interval)
-		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, int64(3), timer.counter.Load())
+		tmr := newCondCountTimer(1, cond, 3, func() {})
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(math.MaxInt64), tmr.interval)
+		assert.Equal(t, cond, tmr.condition)
+		assert.Equal(t, int64(3), tmr.counter.Load())
 	})
 }
 
 // TestTicker_Constructors 测试Ticker构造函数
 func TestTicker_Constructors(t *testing.T) {
 	t.Run("newTicker", func(t *testing.T) {
-		timer, ticker := newTicker(1, time.Second)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr, ticker := newTicker(1, time.Second)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 		assert.NotNil(t, ticker)
 	})
 
 	t.Run("newCountTicker", func(t *testing.T) {
-		timer, ticker := newCountTicker(1, time.Second, 5)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, int64(5), timer.counter.Load())
+		tmr, ticker := newCountTicker(1, time.Second, 5)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, int64(5), tmr.counter.Load())
 		assert.NotNil(t, ticker)
 	})
 
 	t.Run("newAfterTicker", func(t *testing.T) {
-		timer, ticker := newAfterTicker(1, time.Second)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(time.Second), timer.interval)
-		assert.Nil(t, timer.condition)
-		assert.Equal(t, int64(1), timer.counter.Load())
+		tmr, ticker := newAfterTicker(1, time.Second)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(time.Second), tmr.interval)
+		assert.Nil(t, tmr.condition)
+		assert.Equal(t, int64(1), tmr.counter.Load())
 		assert.NotNil(t, ticker)
 	})
 
 	t.Run("newCondTicker", func(t *testing.T) {
 		cond := &testCondition{}
-		timer, ticker := newCondTicker(1, cond)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(math.MaxInt64), timer.interval)
-		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr, ticker := newCondTicker(1, cond)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(math.MaxInt64), tmr.interval)
+		assert.Equal(t, cond, tmr.condition)
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 		assert.NotNil(t, ticker)
 	})
 
 	t.Run("newCondCountTicker", func(t *testing.T) {
 		cond := &testCondition{}
-		timer, ticker := newCondCountTicker(1, cond, 3)
-		assert.Equal(t, int64(1), timer.id)
-		assert.Equal(t, int64(math.MaxInt64), timer.interval)
-		assert.Equal(t, cond, timer.condition)
-		assert.Equal(t, int64(3), timer.counter.Load())
+		tmr, ticker := newCondCountTicker(1, cond, 3)
+		assert.Equal(t, int64(1), tmr.id)
+		assert.Equal(t, int64(math.MaxInt64), tmr.interval)
+		assert.Equal(t, cond, tmr.condition)
+		assert.Equal(t, int64(3), tmr.counter.Load())
 		assert.NotNil(t, ticker)
 	})
 }

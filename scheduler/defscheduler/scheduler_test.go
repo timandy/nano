@@ -112,18 +112,18 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewTimer(50*time.Millisecond, func() {
+		tmr := s.NewTimer(50*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行几次
 		assert.Eventually(t, func() bool {
 			return execCount.Load() >= 2
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop()
+		tmr.Stop()
 		currentCount := execCount.Load()
 
 		// 等待一段时间，确保停止后不再执行
@@ -133,11 +133,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewCountTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewCountTimer(20*time.Millisecond, 3, func() {
+		tmr := s.NewCountTimer(20*time.Millisecond, 3, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行完成
 		assert.Eventually(t, func() bool {
@@ -151,11 +151,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewAfterTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewAfterTimer(50*time.Millisecond, func() {
+		tmr := s.NewAfterTimer(50*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行
 		assert.Eventually(t, func() bool {
@@ -170,11 +170,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 	t.Run("NewCondTimer", func(t *testing.T) {
 		var execCount atomic.Int32
 		cond := &testCondition{}
-		timer := s.NewCondTimer(cond, func() {
+		tmr := s.NewCondTimer(cond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 条件不满足时不执行
 		cond.shouldTrigger.Store(false)
@@ -187,7 +187,7 @@ func TestScheduler_TimerMethods(t *testing.T) {
 			return execCount.Load() >= 1
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop()
+		tmr.Stop()
 	})
 
 	t.Run("NewCondCountTimer", func(t *testing.T) {
@@ -195,11 +195,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 		cond := &testCondition{}
 		cond.shouldTrigger.Store(true)
 
-		timer := s.NewCondCountTimer(cond, 2, func() {
+		tmr := s.NewCondCountTimer(cond, 2, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行完成
 		assert.Eventually(t, func() bool {
@@ -557,7 +557,7 @@ func TestScheduler_Integration(t *testing.T) {
 		}
 
 		// 添加定时器
-		timer := s.NewCountTimer(20*time.Millisecond, 5, func() {
+		tmr := s.NewCountTimer(20*time.Millisecond, 5, func() {
 			timerCount.Add(1)
 		})
 
@@ -566,7 +566,7 @@ func TestScheduler_Integration(t *testing.T) {
 			return taskCount.Load() == 10 && timerCount.Load() == 5
 		}, 2*time.Second, 10*time.Millisecond)
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 	})
 
 	t.Run("High Concurrency Stress Test", func(t *testing.T) {
@@ -610,8 +610,8 @@ func TestScheduler_Integration(t *testing.T) {
 				timerExecuted.Load() == 20
 		}, 5*time.Second, 50*time.Millisecond)
 
-		for _, timer := range timers {
-			assert.NotNil(t, timer)
+		for _, tmr := range timers {
+			assert.NotNil(t, tmr)
 		}
 	})
 }
@@ -665,7 +665,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		defer s.Close()
 
 		var execCount atomic.Int32
-		timer := s.NewCountTimer(time.Nanosecond, 10, func() {
+		tmr := s.NewCountTimer(time.Nanosecond, 10, func() {
 			execCount.Add(1)
 		})
 
@@ -673,7 +673,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 			return execCount.Load() == 10
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop() // 即使已经执行完也应该安全
+		tmr.Stop() // 即使已经执行完也应该安全
 	})
 
 	t.Run("Timer With Very Long Interval", func(t *testing.T) {
@@ -682,7 +682,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		defer s.Close()
 
 		var execCount atomic.Int32
-		timer := s.NewTimer(time.Hour, func() {
+		tmr := s.NewTimer(time.Hour, func() {
 			execCount.Add(1)
 		})
 
@@ -690,7 +690,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		assert.Equal(t, int32(0), execCount.Load())
 
-		timer.Stop()
+		tmr.Stop()
 	})
 
 	t.Run("Stop Timer Immediately After Creation", func(t *testing.T) {
@@ -699,11 +699,11 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		defer s.Close()
 
 		var execCount atomic.Int32
-		timer := s.NewTimer(10*time.Millisecond, func() {
+		tmr := s.NewTimer(10*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
-		timer.Stop() // 立即停止
+		tmr.Stop() // 立即停止
 
 		// 等待一段时间，确保不执行
 		time.Sleep(100 * time.Millisecond)
@@ -778,8 +778,8 @@ func BenchmarkScheduler(b *testing.B) {
 	b.Run("Create Timers", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			timer := s.NewAfterTimer(time.Hour, func() {})
-			timer.Stop()
+			tmr := s.NewAfterTimer(time.Hour, func() {})
+			tmr.Stop()
 		}
 	})
 }

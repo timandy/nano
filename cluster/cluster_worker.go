@@ -9,18 +9,18 @@ import (
 	"github.com/lonng/nano/session"
 )
 
-var _ clusterpb.WorkerServer = worker{}
-var _ clusterpb.WorkerServer = (*worker)(nil)
+var _ clusterpb.WorkerServer = workerService{}
+var _ clusterpb.WorkerServer = (*workerService)(nil)
 
-type worker struct {
+type workerService struct {
 	node *Node
 }
 
-func newWorker(node *Node) worker {
-	return worker{node: node}
+func newWorkerService(node *Node) workerService {
+	return workerService{node: node}
 }
 
-func (w worker) HandleRequest(_ context.Context, req *clusterpb.RequestMessage) (*clusterpb.MemberHandleResponse, error) {
+func (w workerService) HandleRequest(_ context.Context, req *clusterpb.RequestMessage) (*clusterpb.MemberHandleResponse, error) {
 	handlerNode, found := w.node.handler.localHandlers[req.Route]
 	if !found {
 		return nil, fmt.Errorf("service not found in current node: %v", req.Route)
@@ -39,7 +39,7 @@ func (w worker) HandleRequest(_ context.Context, req *clusterpb.RequestMessage) 
 	return &clusterpb.MemberHandleResponse{}, nil
 }
 
-func (w worker) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*clusterpb.MemberHandleResponse, error) {
+func (w workerService) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*clusterpb.MemberHandleResponse, error) {
 	handler, found := w.node.handler.localHandlers[req.Route]
 	if !found {
 		return nil, fmt.Errorf("service not found in current node: %v", req.Route)
@@ -58,7 +58,7 @@ func (w worker) HandleNotify(_ context.Context, req *clusterpb.NotifyMessage) (*
 }
 
 // SessionClosed 集群模式中, 作为 Worker 时, 处理 Gate 发来的 Session 已关闭的事件(被动关闭)
-func (w worker) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
+func (w workerService) SessionClosed(_ context.Context, req *clusterpb.SessionClosedRequest) (*clusterpb.SessionClosedResponse, error) {
 	// Worker 主动关闭时, 通知 Gate, 然后 Gate 会再次通知 Worker, 但此时 session 已经被删除 found==false, 不会触发事件(主动删除的时候已经触发了)
 	s, found := w.node.delSession(req.SessionId)
 	if found {

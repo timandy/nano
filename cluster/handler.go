@@ -196,8 +196,8 @@ func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 // handle 循环读取数据包, 一个连接开启一个单独的写线程
 func (h *LocalHandler) handle(conn net.Conn) {
 	// create a client agent and startup write gorontine
-	agent := newAgent(conn, h.pipeline, h.remoteProcess)
-	s := agent.session
+	agt := newAgent(conn, h.pipeline, h.remoteProcess)
+	s := agt.session
 	h.node.saveSession(s.ID(), s)
 	defer func() {
 		h.node.delSession(s.ID())                                //防止 session 泄露
@@ -205,10 +205,10 @@ func (h *LocalHandler) handle(conn net.Conn) {
 	}()
 
 	// startup write goroutine
-	go agent.write()
+	go agt.write()
 
 	if env.Debug {
-		log.Info("New session established: %s", agent.String())
+		log.Info("New session established: %s", agt.String())
 	}
 
 	// guarantee agent related resource be destroyed
@@ -234,7 +234,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 			}
 		}
 
-		_ = agent.Close()
+		_ = agt.Close()
 		if env.Debug {
 			log.Info("Session read goroutine exit, SessionID=%d, UID=%d", s.ID(), s.UID())
 		}
@@ -250,13 +250,13 @@ func (h *LocalHandler) handle(conn net.Conn) {
 		}
 
 		// TODO(warning): decoder use slice for performance, packet data should be copy before next Decode
-		packets, err := agent.decoder.Decode(buf[:n])
+		packets, err := agt.decoder.Decode(buf[:n])
 		if err != nil {
 			log.Error("Decode packet error.", err)
 
 			// 处理已经解码的包并返回
 			for _, p := range packets {
-				if err := h.processPacket(agent, p); err != nil {
+				if err = h.processPacket(agt, p); err != nil {
 					log.Error("Process packet error.", err)
 					return
 				}
@@ -266,7 +266,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 
 		// 处理所有包
 		for _, p := range packets {
-			if err := h.processPacket(agent, p); err != nil {
+			if err = h.processPacket(agt, p); err != nil {
 				log.Error("Process packet error.", err)
 				return
 			}

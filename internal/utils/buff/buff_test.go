@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	data       = []byte("hello world, hello world, hello world, hello world")
-	old        = []byte("world")
-	newVal     = []byte("gopher")
+	benchData  = []byte("hello world, hello world, hello world, hello world")
+	benchOld   = []byte("world")
+	benchNew   = []byte("gopher")
 	replaceOff = 13 // 从第二个 "world" 开始替换
 )
 
@@ -74,14 +74,14 @@ func TestReplace_EmptyOld(t *testing.T) {
 
 func BenchmarkBuffReplace(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = buff.Replace(data, old, newVal, replaceOff)
+		_ = buff.Replace(benchData, benchOld, benchNew, replaceOff)
 	}
 }
 
 func BenchmarkBytesReplace(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// 注意这里无法传 offset，只能从头替换一次
-		_ = bytes.Replace(data, old, newVal, 1)
+		_ = bytes.Replace(benchData, benchOld, benchNew, 1)
 	}
 }
 

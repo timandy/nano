@@ -48,7 +48,7 @@ type Node struct {
 	upgrader *websocket.Upgrader //升级器
 	opts     *Options            //选项
 
-	cluster   *cluster
+	cluster   *clusterService
 	handler   *LocalHandler
 	rpcServer *grpc.Server
 	rpcClient *rpcClient
@@ -91,7 +91,7 @@ func NewNode(engine npi.Engine, opts *Options) *Node {
 	}
 
 	//创建处理器
-	n.cluster = newCluster(n) //master 和 member 都需要初始化该实例, 用来管理远程节点
+	n.cluster = newClusterService(n) //master 和 member 都需要初始化该实例, 用来管理远程节点
 	n.handler = newHandler(n)
 
 	//注册服务, 扫描方法
@@ -142,7 +142,7 @@ func (n *Node) startGrpc() {
 
 	// 开始 gRPC 服务
 	go func() {
-		err := n.rpcServer.Serve(listener)
+		err = n.rpcServer.Serve(listener)
 		if err != nil {
 			log.Fatal("Start current node failed.", err)
 		}
@@ -209,13 +209,13 @@ func (n *Node) registerServices() {
 		clusterpb.RegisterMasterServer(n.rpcServer, n.cluster)
 	}
 	if nodeType.IsMember() {
-		clusterpb.RegisterMemberServer(n.rpcServer, newMember(n))
+		clusterpb.RegisterMemberServer(n.rpcServer, newMemberService(n))
 	}
 	if nodeType.IsGate() {
-		clusterpb.RegisterGateServer(n.rpcServer, newGate(n))
+		clusterpb.RegisterGateServer(n.rpcServer, newGateService(n))
 	}
 	if nodeType.IsWorker() {
-		clusterpb.RegisterWorkerServer(n.rpcServer, newWorker(n))
+		clusterpb.RegisterWorkerServer(n.rpcServer, newWorkerService(n))
 	}
 }
 

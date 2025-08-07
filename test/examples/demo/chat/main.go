@@ -152,9 +152,9 @@ func main() {
 
 	// traffic stats
 	pip := pipeline.New()
-	var stats = &stats{}
-	pip.Outbound().PushBack(stats.outbound)
-	pip.Inbound().PushBack(stats.inbound)
+	var stat = &stats{}
+	pip.Outbound().PushBack(stat.outbound)
+	pip.Inbound().PushBack(stat.inbound)
 
 	e := nano.New(
 		nano.WithPipeline(pip),

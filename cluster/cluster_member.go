@@ -8,29 +8,29 @@ import (
 	"github.com/lonng/nano/internal/log"
 )
 
-var _ clusterpb.MemberServer = member{}
-var _ clusterpb.MemberServer = (*member)(nil)
+var _ clusterpb.MemberServer = memberService{}
+var _ clusterpb.MemberServer = (*memberService)(nil)
 
-type member struct {
+type memberService struct {
 	node *Node
 }
 
-func newMember(node *Node) member {
-	return member{node: node}
+func newMemberService(node *Node) memberService {
+	return memberService{node: node}
 }
 
-func (m member) NewMember(_ context.Context, req *clusterpb.NewMemberRequest) (*clusterpb.NewMemberResponse, error) {
+func (m memberService) NewMember(_ context.Context, req *clusterpb.NewMemberRequest) (*clusterpb.NewMemberResponse, error) {
 	if env.Debug {
-		log.Info("NewMember member", req.String())
+		log.Info("NewMember member %v", req.String())
 	}
 	m.node.handler.addRemoteService(req.MemberInfo)
 	m.node.cluster.addMember(req.MemberInfo)
 	return &clusterpb.NewMemberResponse{}, nil
 }
 
-func (m member) DelMember(_ context.Context, req *clusterpb.DelMemberRequest) (*clusterpb.DelMemberResponse, error) {
+func (m memberService) DelMember(_ context.Context, req *clusterpb.DelMemberRequest) (*clusterpb.DelMemberResponse, error) {
 	if env.Debug {
-		log.Info("DelMember member", req.String())
+		log.Info("DelMember member %v", req.String())
 	}
 	m.node.handler.delMember(req.ServiceAddr)
 	m.node.cluster.delMember(req.ServiceAddr)

@@ -17,11 +17,11 @@ func TestTimerManager(t *testing.T) {
 			timers: make(map[int64]*timer),
 		}
 
-		timer := newTimer(1, time.Second, func() {})
-		tm.addTimer(timer)
+		tmr := newTimer(1, time.Second, func() {})
+		tm.addTimer(tmr)
 
 		assert.Len(t, tm.pendingTimers, 1)
-		assert.Equal(t, timer, tm.pendingTimers[0])
+		assert.Equal(t, tmr, tm.pendingTimers[0])
 	})
 
 	t.Run("Steal Timers", func(t *testing.T) {
@@ -56,10 +56,10 @@ func TestTimerManager(t *testing.T) {
 		}
 
 		// 创建一个会自动停止的定时器
-		timer := newCountTimer(1, time.Nanosecond, 1, func() {
+		tmr := newCountTimer(1, time.Nanosecond, 1, func() {
 			execCount.Add(1)
 		})
-		tm.addTimer(timer)
+		tm.addTimer(tmr)
 
 		// 执行cron
 		time.Sleep(20 * time.Millisecond)
@@ -86,8 +86,8 @@ func TestTimerManager(t *testing.T) {
 				defer wg.Done()
 				for j := 0; j < numTimersPerGoroutine; j++ {
 					id := int64(base*numTimersPerGoroutine + j)
-					timer := newTimer(id, time.Second, func() {})
-					tm.addTimer(timer)
+					tmr := newTimer(id, time.Second, func() {})
+					tm.addTimer(tmr)
 				}
 			}(i)
 		}
@@ -108,42 +108,42 @@ func TestTimerManager_NewTimerMethods(t *testing.T) {
 	}
 
 	t.Run("NewTimer", func(t *testing.T) {
-		timer := tm.newTimer(time.Second, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(1), timer.ID())
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr := tm.newTimer(time.Second, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(1), tmr.ID())
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 	})
 
 	t.Run("NewCountTimer", func(t *testing.T) {
-		timer := tm.newCountTimer(time.Second, 5, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(2), timer.ID())
-		assert.Equal(t, int64(5), timer.counter.Load())
+		tmr := tm.newCountTimer(time.Second, 5, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(2), tmr.ID())
+		assert.Equal(t, int64(5), tmr.counter.Load())
 	})
 
 	t.Run("NewAfterTimer", func(t *testing.T) {
-		timer := tm.newAfterTimer(time.Second, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(3), timer.ID())
-		assert.Equal(t, int64(1), timer.counter.Load())
+		tmr := tm.newAfterTimer(time.Second, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(3), tmr.ID())
+		assert.Equal(t, int64(1), tmr.counter.Load())
 	})
 
 	t.Run("NewCondTimer", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := tm.newCondTimer(cond, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(4), timer.ID())
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
-		assert.NotNil(t, timer.condition)
+		tmr := tm.newCondTimer(cond, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(4), tmr.ID())
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
+		assert.NotNil(t, tmr.condition)
 	})
 
 	t.Run("NewCondCountTimer", func(t *testing.T) {
 		cond := &testCondition{}
-		timer := tm.newCondCountTimer(cond, 3, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(5), timer.ID())
-		assert.Equal(t, int64(3), timer.counter.Load())
-		assert.NotNil(t, timer.condition)
+		tmr := tm.newCondCountTimer(cond, 3, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(5), tmr.ID())
+		assert.Equal(t, int64(3), tmr.counter.Load())
+		assert.NotNil(t, tmr.condition)
 	})
 }
 
@@ -165,8 +165,8 @@ func TestTimerManager_StealTimersRaceCondition(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numOperations; j++ {
 				id := int64(base*numOperations + j)
-				timer := newTimer(id, time.Second, func() {})
-				tm.addTimer(timer)
+				tmr := newTimer(id, time.Second, func() {})
+				tm.addTimer(tmr)
 			}
 		}(i)
 	}

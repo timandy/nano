@@ -17,7 +17,7 @@ func TestProtobufSerialezer_Serialize(t *testing.T) {
 	}
 
 	m1 := &testdata.Ping{}
-	if err := s.Unmarshal(b, m1); err != nil {
+	if err = s.Unmarshal(b, m1); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 	// refer: https://developers.google.com/protocol-buffers/docs/reference/go/faq#deepequal
@@ -50,7 +50,7 @@ func BenchmarkSerializer_Deserialize(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		m1 := &testdata.Ping{}
-		if err := s.Unmarshal(d, m1); err != nil {
+		if err = s.Unmarshal(d, m1); err != nil {
 			b.Fatalf("unmarshal failed: %v", err)
 		}
 	}

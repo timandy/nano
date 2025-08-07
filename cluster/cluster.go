@@ -32,12 +32,12 @@ import (
 	"github.com/lonng/nano/scheduler"
 )
 
-var _ clusterpb.MasterServer = (*cluster)(nil)
+var _ clusterpb.MasterServer = (*clusterService)(nil)
 
 // cluster 成员节点管理器.
 // 当前节点作为 master 时, 该结构可作为 rpc server.
 // 作为 member 时, 该结构可作为存储集群内节点列表的容器.
-type cluster struct {
+type clusterService struct {
 	// If cluster is not large enough, use slice is OK
 	node *Node
 
@@ -46,8 +46,8 @@ type cluster struct {
 }
 
 // 构造函数
-func newCluster(node *Node) *cluster {
-	c := &cluster{node: node}
+func newClusterService(node *Node) *clusterService {
+	c := &clusterService{node: node}
 	if node.opts.NodeType.IsMaster() {
 		c.startHeartbeatCheckTimer()
 	}
@@ -55,7 +55,7 @@ func newCluster(node *Node) *cluster {
 }
 
 // Register implements the MasterServer gRPC service
-func (c *cluster) Register(_ context.Context, req *clusterpb.RegisterRequest) (*clusterpb.RegisterResponse, error) {
+func (c *clusterService) Register(_ context.Context, req *clusterpb.RegisterRequest) (*clusterpb.RegisterResponse, error) {
 	if req.MemberInfo == nil {
 		return nil, ErrInvalidRegisterReq
 	}
@@ -92,7 +92,7 @@ func (c *cluster) Register(_ context.Context, req *clusterpb.RegisterRequest) (*
 }
 
 // Unregister implements the MasterServer gRPC service
-func (c *cluster) Unregister(_ context.Context, req *clusterpb.UnregisterRequest) (*clusterpb.UnregisterResponse, error) {
+func (c *clusterService) Unregister(_ context.Context, req *clusterpb.UnregisterRequest) (*clusterpb.UnregisterResponse, error) {
 	if req.ServiceAddr == "" {
 		return nil, ErrInvalidRegisterReq
 	}
@@ -150,7 +150,7 @@ func (c *cluster) Unregister(_ context.Context, req *clusterpb.UnregisterRequest
 	return resp, nil
 }
 
-func (c *cluster) Heartbeat(_ context.Context, req *clusterpb.HeartbeatRequest) (*clusterpb.HeartbeatResponse, error) {
+func (c *clusterService) Heartbeat(_ context.Context, req *clusterpb.HeartbeatRequest) (*clusterpb.HeartbeatResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -176,7 +176,7 @@ func (c *cluster) Heartbeat(_ context.Context, req *clusterpb.HeartbeatRequest) 
 	return &clusterpb.HeartbeatResponse{}, nil
 }
 
-func (c *cluster) initMembers(members []*clusterpb.MemberInfo) {
+func (c *clusterService) initMembers(members []*clusterpb.MemberInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, info := range members {
@@ -186,7 +186,7 @@ func (c *cluster) initMembers(members []*clusterpb.MemberInfo) {
 	}
 }
 
-func (c *cluster) addMember(info *clusterpb.MemberInfo) {
+func (c *clusterService) addMember(info *clusterpb.MemberInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var found bool
@@ -204,7 +204,7 @@ func (c *cluster) addMember(info *clusterpb.MemberInfo) {
 	}
 }
 
-func (c *cluster) delMember(addr string) {
+func (c *clusterService) delMember(addr string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var index = -1
@@ -223,7 +223,7 @@ func (c *cluster) delMember(addr string) {
 	}
 }
 
-func (c *cluster) startHeartbeatCheckTimer() {
+func (c *clusterService) startHeartbeatCheckTimer() {
 	if !c.node.opts.NodeType.IsMaster() {
 		return
 	}
@@ -239,7 +239,7 @@ func (c *cluster) startHeartbeatCheckTimer() {
 	}()
 }
 
-func (c *cluster) checkHeartbeat() {
+func (c *clusterService) checkHeartbeat() {
 	unregisterMembers := make([]*Member, 0)
 	// check heartbeat time
 	for _, m := range c.members {
@@ -258,7 +258,7 @@ func (c *cluster) checkHeartbeat() {
 	}
 }
 
-func (c *cluster) remoteAddrs() []string {
+func (c *clusterService) remoteAddrs() []string {
 	var addrs []string
 	c.mu.RLock()
 	defer c.mu.RUnlock()

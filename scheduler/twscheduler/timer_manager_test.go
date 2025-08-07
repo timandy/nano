@@ -38,13 +38,13 @@ func TestTimerManager(t *testing.T) {
 			tm.slots[i] = &slot{}
 		}
 
-		timer := newTimer(1, 50*time.Millisecond, func() {})
-		tm.addTimer(timer, int64(50*time.Millisecond))
+		tmr := newTimer(1, 50*time.Millisecond, func() {})
+		tm.addTimer(tmr, int64(50*time.Millisecond))
 
 		// 验证定时器被添加到正确的槽位
 		expectedSlot := (0 + 50) & 15 // 50/1 = 50, slot = 50 & 15 = 2
-		assert.Equal(t, tm.slots[expectedSlot], timer.slot)
-		assert.Equal(t, timer, tm.slots[expectedSlot].head)
+		assert.Equal(t, tm.slots[expectedSlot], tmr.slot)
+		assert.Equal(t, tmr, tm.slots[expectedSlot].head)
 	})
 
 	t.Run("Add Timer with zero delay", func(t *testing.T) {
@@ -58,11 +58,11 @@ func TestTimerManager(t *testing.T) {
 			tm.slots[i] = &slot{}
 		}
 
-		timer := newTimer(1, 50*time.Millisecond, func() {})
-		tm.addTimer(timer, 0) // 零延迟应该被设置为1
+		tmr := newTimer(1, 50*time.Millisecond, func() {})
+		tm.addTimer(tmr, 0) // 零延迟应该被设置为1
 
 		expectedSlot := (0 + 1) & 15
-		assert.Equal(t, tm.slots[expectedSlot], timer.slot)
+		assert.Equal(t, tm.slots[expectedSlot], tmr.slot)
 	})
 
 	t.Run("Next slot advancement", func(t *testing.T) {
@@ -76,14 +76,14 @@ func TestTimerManager(t *testing.T) {
 			tm.slots[i] = &slot{}
 		}
 
-		slot := tm.next()
-		assert.Equal(t, tm.slots[5], slot)
+		slt := tm.next()
+		assert.Equal(t, tm.slots[5], slt)
 		assert.Equal(t, int64(6), tm.current)
 
 		// 测试环绕
 		tm.current = 15
-		slot = tm.next()
-		assert.Equal(t, tm.slots[15], slot)
+		slt = tm.next()
+		assert.Equal(t, tm.slots[15], slt)
 		assert.Equal(t, int64(0), tm.current)
 	})
 
@@ -120,15 +120,15 @@ func TestTimerManager(t *testing.T) {
 		s := NewScheduler("test", time.Millisecond, 16).(*scheduler)
 		defer s.Close()
 
-		timer := newTimer(1, 50*time.Millisecond, func() {})
-		timer.Stop()
-		tm.addTimer(timer, int64(50*time.Millisecond))
+		tmr := newTimer(1, 50*time.Millisecond, func() {})
+		tmr.Stop()
+		tm.addTimer(tmr, int64(50*time.Millisecond))
 
 		// 执行一轮后, 停止的定时器应该被清理
 		for i := 0; i < 16; i++ {
 			tm.advance(s)
 		}
-		assert.Nil(t, timer.slot)
+		assert.Nil(t, tmr.slot)
 	})
 
 	t.Run("Advance with condition timer", func(t *testing.T) {
@@ -148,12 +148,12 @@ func TestTimerManager(t *testing.T) {
 		cond := &testCondition{shouldTrigger: atomic.Bool{}}
 		cond.shouldTrigger.Store(true)
 
-		timer := newCondTimer(1, cond, func() {})
-		tm.addTimer(timer, 0)
+		tmr := newCondTimer(1, cond, func() {})
+		tm.addTimer(tmr, 0)
 
 		// 条件定时器应该执行并重新调度
 		tm.advance(s)
-		assert.NotNil(t, timer.slot) // 应该被重新调度
+		assert.NotNil(t, tmr.slot) // 应该被重新调度
 	})
 
 	t.Run("Close timer manager", func(t *testing.T) {
@@ -168,8 +168,8 @@ func TestTimerManager(t *testing.T) {
 		}
 
 		// 添加一些定时器
-		timer := newTimer(1, 50*time.Millisecond, func() {})
-		tm.addTimer(timer, int64(50*time.Millisecond))
+		tmr := newTimer(1, 50*time.Millisecond, func() {})
+		tm.addTimer(tmr, int64(50*time.Millisecond))
 
 		tm.close()
 
@@ -193,42 +193,42 @@ func TestTimerManager_NewTimerMethods(t *testing.T) {
 	}
 
 	t.Run("newTimer", func(t *testing.T) {
-		timer := tm.newTimer(time.Second, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(1), timer.ID())
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
+		tmr := tm.newTimer(time.Second, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(1), tmr.ID())
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
 	})
 
 	t.Run("newCountTimer", func(t *testing.T) {
-		timer := tm.newCountTimer(time.Second, 5, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(2), timer.ID())
-		assert.Equal(t, int64(5), timer.counter.Load())
+		tmr := tm.newCountTimer(time.Second, 5, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(2), tmr.ID())
+		assert.Equal(t, int64(5), tmr.counter.Load())
 	})
 
 	t.Run("newAfterTimer", func(t *testing.T) {
-		timer := tm.newAfterTimer(time.Second, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(3), timer.ID())
-		assert.Equal(t, int64(1), timer.counter.Load())
+		tmr := tm.newAfterTimer(time.Second, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(3), tmr.ID())
+		assert.Equal(t, int64(1), tmr.counter.Load())
 	})
 
 	t.Run("newCondTimer", func(t *testing.T) {
 		cond := &testCondition{shouldTrigger: atomic.Bool{}}
-		timer := tm.newCondTimer(cond, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(4), timer.ID())
-		assert.Equal(t, schedulerapi.Infinite, timer.counter.Load())
-		assert.NotNil(t, timer.condition)
+		tmr := tm.newCondTimer(cond, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(4), tmr.ID())
+		assert.Equal(t, schedulerapi.Infinite, tmr.counter.Load())
+		assert.NotNil(t, tmr.condition)
 	})
 
 	t.Run("newCondCountTimer", func(t *testing.T) {
 		cond := &testCondition{shouldTrigger: atomic.Bool{}}
-		timer := tm.newCondCountTimer(cond, 3, func() {})
-		assert.NotNil(t, timer)
-		assert.Equal(t, int64(5), timer.ID())
-		assert.Equal(t, int64(3), timer.counter.Load())
-		assert.NotNil(t, timer.condition)
+		tmr := tm.newCondCountTimer(cond, 3, func() {})
+		assert.NotNil(t, tmr)
+		assert.Equal(t, int64(5), tmr.ID())
+		assert.Equal(t, int64(3), tmr.counter.Load())
+		assert.NotNil(t, tmr.condition)
 	})
 }
 
@@ -314,8 +314,8 @@ func TestTimerManager_ConcurrentAddTimer(t *testing.T) {
 		go func(base int) {
 			defer wg.Done()
 			for j := 0; j < numTimersPerGoroutine; j++ {
-				timer := newTimer(int64(base*numTimersPerGoroutine+j), time.Second, func() {})
-				tm.addTimer(timer, int64(time.Second))
+				tmr := newTimer(int64(base*numTimersPerGoroutine+j), time.Second, func() {})
+				tm.addTimer(tmr, int64(time.Second))
 			}
 		}(i)
 	}
@@ -325,14 +325,14 @@ func TestTimerManager_ConcurrentAddTimer(t *testing.T) {
 	// 验证所有定时器都被正确添加
 	totalTimers := 0
 	for i := 0; i < 16; i++ {
-		slot := tm.slots[i]
-		slot.mu.Lock()
+		slt := tm.slots[i]
+		slt.mu.Lock()
 		count := 0
-		for t := slot.head; t != nil; t = t.next {
+		for tmr := slt.head; tmr != nil; tmr = tmr.next {
 			count++
 		}
 		totalTimers += count
-		slot.mu.Unlock()
+		slt.mu.Unlock()
 	}
 	assert.Equal(t, numGoroutines*numTimersPerGoroutine, totalTimers)
 }

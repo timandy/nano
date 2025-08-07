@@ -126,7 +126,7 @@ func (c *Connector) Request(route string, v proto.Message, callback Callback) er
 	}
 
 	c.setResponseHandler(c.mid, callback)
-	if err := c.sendMessage(msg); err != nil {
+	if err = c.sendMessage(msg); err != nil {
 		c.setResponseHandler(c.mid, nil)
 		return err
 	}

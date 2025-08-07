@@ -46,7 +46,7 @@ func TestConcurrent(t *testing.T) {
 	lock := sync.Mutex{}
 	for i := 0; i < concurrent; i++ {
 		go func() {
-			for i := 0; i < loop; i++ {
+			for j := 0; j < loop; j++ {
 				lock.Lock()
 				ids = append(ids, snowFlake.NextId())
 				lock.Unlock()

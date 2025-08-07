@@ -138,18 +138,18 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewTimer(50*time.Millisecond, func() {
+		tmr := s.NewTimer(50*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行几次
 		assert.Eventually(t, func() bool {
 			return execCount.Load() >= 2
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop()
+		tmr.Stop()
 		currentCount := execCount.Load()
 
 		// 等待一段时间，确保停止后不再执行
@@ -159,11 +159,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewCountTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewCountTimer(20*time.Millisecond, 3, func() {
+		tmr := s.NewCountTimer(20*time.Millisecond, 3, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行完成
 		assert.Eventually(t, func() bool {
@@ -177,11 +177,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("NewAfterTimer", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewAfterTimer(50*time.Millisecond, func() {
+		tmr := s.NewAfterTimer(50*time.Millisecond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行
 		assert.Eventually(t, func() bool {
@@ -196,11 +196,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 	t.Run("NewCondTimer", func(t *testing.T) {
 		var execCount atomic.Int32
 		cond := &testCondition{shouldTrigger: atomic.Bool{}}
-		timer := s.NewCondTimer(cond, func() {
+		tmr := s.NewCondTimer(cond, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 条件不满足时不执行
 		cond.shouldTrigger.Store(false)
@@ -213,7 +213,7 @@ func TestScheduler_TimerMethods(t *testing.T) {
 			return execCount.Load() >= 1
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop()
+		tmr.Stop()
 	})
 
 	t.Run("NewCondCountTimer", func(t *testing.T) {
@@ -221,11 +221,11 @@ func TestScheduler_TimerMethods(t *testing.T) {
 		cond := &testCondition{shouldTrigger: atomic.Bool{}}
 		cond.shouldTrigger.Store(true)
 
-		timer := s.NewCondCountTimer(cond, 2, func() {
+		tmr := s.NewCondCountTimer(cond, 2, func() {
 			execCount.Add(1)
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行完成
 		assert.Eventually(t, func() bool {
@@ -239,12 +239,12 @@ func TestScheduler_TimerMethods(t *testing.T) {
 
 	t.Run("Timer panic recovery", func(t *testing.T) {
 		var execCount atomic.Int32
-		timer := s.NewTimer(10*time.Millisecond, func() {
+		tmr := s.NewTimer(10*time.Millisecond, func() {
 			execCount.Add(1)
 			panic("timer panic")
 		})
 
-		assert.NotNil(t, timer)
+		assert.NotNil(t, tmr)
 
 		// 等待执行，调度器应该捕获panic并继续运行
 		assert.Eventually(t, func() bool {
@@ -260,7 +260,7 @@ func TestScheduler_TimerMethods(t *testing.T) {
 			return newExec.Load()
 		}, time.Second, 10*time.Millisecond)
 
-		timer.Stop()
+		tmr.Stop()
 	})
 }
 
@@ -638,11 +638,11 @@ func TestScheduler_ConcurrentOperations(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for j := 0; j < numTimersPerGoroutine; j++ {
-					timer := s.NewTimer(10*time.Millisecond, func() {
+					tmr := s.NewTimer(10*time.Millisecond, func() {
 						counter.Add(1)
 					})
 					timersMu.Lock()
-					timers = append(timers, timer)
+					timers = append(timers, tmr)
 					timersMu.Unlock()
 				}
 			}()
@@ -655,8 +655,8 @@ func TestScheduler_ConcurrentOperations(t *testing.T) {
 
 		// 清理所有定时器
 		timersMu.Lock()
-		for _, timer := range timers {
-			timer.Stop()
+		for _, tmr := range timers {
+			tmr.Stop()
 		}
 		timersMu.Unlock()
 
@@ -752,10 +752,10 @@ func TestScheduler_Integration(t *testing.T) {
 	}))
 
 	// 添加定时器
-	timer := s.NewTimer(20*time.Millisecond, func() {
+	tmr := s.NewTimer(20*time.Millisecond, func() {
 		timerCounter.Add(1)
 	})
-	defer timer.Stop()
+	defer tmr.Stop()
 
 	// 添加计数器定时器
 	countTimer := s.NewCountTimer(30*time.Millisecond, 2, func() {

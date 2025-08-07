@@ -19,7 +19,7 @@ func TestSerializer_Serialize(t *testing.T) {
 	}
 
 	m2 := Message{}
-	if err := s.Unmarshal(b, &m2); err != nil {
+	if err = s.Unmarshal(b, &m2); err != nil {
 		t.Fail()
 	}
 
@@ -52,7 +52,7 @@ func BenchmarkSerializer_Deserialize(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		m1 := &Message{}
-		if err := s.Unmarshal(d, m1); err != nil {
+		if err = s.Unmarshal(d, m1); err != nil {
 			b.Fatalf("unmarshal failed: %v", err)
 		}
 	}

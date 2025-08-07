@@ -44,7 +44,7 @@ func TestPack(t *testing.T) {
 	}
 
 	_ = &Packet{Type: Type(0), Data: data, Length: len(data)}
-	if _, err := Encode(Type(0), data); err == nil {
+	if _, err = Encode(Type(0), data); err == nil {
 		t.Error("should err")
 	}
 
