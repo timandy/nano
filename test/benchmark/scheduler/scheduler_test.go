@@ -15,6 +15,25 @@ import (
 
 const taskNum = 100000
 
+func TestSystem_Stress(t *testing.T) {
+	for i := 0; i < taskNum; i++ {
+		idx := i
+		go func() {
+			delay := rand.Int63n(30 * int64(time.Second))
+			time.Sleep(time.Duration(delay))
+			ticker := time.NewTicker(30 * time.Second)
+			for {
+				select {
+				case <-ticker.C:
+					log.Info("timer %v", idx)
+				}
+			}
+		}()
+	}
+
+	time.Sleep(2 * time.Minute)
+}
+
 func TestDefault_Stress(t *testing.T) {
 	scheduler := defscheduler.NewScheduler("test", 500*time.Millisecond)
 	scheduler.Start()
