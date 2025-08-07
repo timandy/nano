@@ -7,7 +7,7 @@ import (
 const paraCount = 500000
 
 func TestNewConnectionService(t *testing.T) {
-	service := newConnectionService()
+	service := newCounterConnection()
 	w := make(chan bool, paraCount)
 	for i := 0; i < paraCount; i++ {
 		go func() {

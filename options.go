@@ -12,7 +12,6 @@ import (
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/serialize"
 	"github.com/lonng/nano/session"
-	"github.com/lonng/nano/session/service"
 	"google.golang.org/grpc"
 )
 
@@ -161,12 +160,5 @@ func WithUnregisterCallback(fn cluster.UnregisterCallback) Option {
 func WithLabel(label string) Option {
 	return func(opt *cluster.Options) {
 		opt.Label = label
-	}
-}
-
-// WithNodeId 使用 snowFlake 算法生成 sessionId 的时候, 使用此设置作为 workerId
-func WithNodeId(nodeId uint64) Option {
-	return func(opt *cluster.Options) {
-		service.ResetNodeId(nodeId)
 	}
 }

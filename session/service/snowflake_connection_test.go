@@ -5,7 +5,7 @@ import (
 )
 
 func TestNewDefaultConnectionServer(t *testing.T) {
-	service := newDefaultConnectionServer(101024)
+	service := newSnowflakeConnection()
 	w := make(chan bool, paraCount)
 	sidChan := make(chan int64, paraCount)
 	for i := 0; i < paraCount; i++ {

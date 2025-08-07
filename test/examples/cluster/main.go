@@ -147,7 +147,6 @@ func runGate(args *cli.Context) error {
 		nano.WithSerializer(json.NewSerializer()),
 		nano.WithCheckOrigin(func(_ *http.Request) bool { return true }),
 		nano.WithDebugMode(),
-		nano.WithNodeId(2), // if you deploy multi gate, option set nodeId, default nodeId = os.Getpid()
 	)
 
 	return engine.RunWs(gateAddr, "/nano")
