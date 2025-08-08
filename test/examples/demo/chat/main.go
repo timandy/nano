@@ -95,7 +95,7 @@ func (mgr *RoomManager) AfterInit() {
 			return
 		}
 		room := s.Value(roomIDKey).(*Room)
-		room.group.Leave(s)
+		room.group.Remove(s)
 	})
 	mgr.timer = scheduler.NewTimer(time.Minute, func() {
 		for roomId, room := range mgr.rooms {

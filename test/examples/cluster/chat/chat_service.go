@@ -51,7 +51,7 @@ func (rs *RoomService) SyncMessage(s *session.Session, msg *SyncMessage) error {
 }
 
 func (rs *RoomService) userDisconnected(s *session.Session) {
-	if err := rs.group.Leave(s); err != nil {
+	if err := rs.group.Remove(s); err != nil {
 		log.Error("Remove user from group failed", s.UID(), err)
 		return
 	}

@@ -35,7 +35,7 @@ func TestChannel_Add(t *testing.T) {
 	}
 
 	// leave
-	c.LeaveAll()
+	c.Clear()
 	if c.Count() != 0 {
 		t.Fail()
 	}

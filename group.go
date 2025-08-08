@@ -34,48 +34,113 @@ const (
 	groupStatusClosed  = 1
 )
 
-// SessionFilter represents a filter which was used to filter session when Multicast,
-// the session will receive the message while filter returns true.
+// SessionFilter 表示用于在组播时会话的过滤器, 过滤器返回 true 的会话将收到消息
 type SessionFilter func(*session.Session) bool
 
-// Group represents a session group which used to manage a number of
-// sessions, data send to the group will send to all session in it.
+// Group 表示一组会话，用于管理多个会话
 type Group struct {
-	mu       sync.RWMutex
-	status   int32                      // channel current status
-	name     string                     // channel name
-	sessions map[int64]*session.Session // session id map to session instance
+	name     string                     // 组名
+	status   atomic.Int32               // 组的状态
+	sessions map[int64]*session.Session // 组内的会话
+	mu       sync.RWMutex               // 组内的会话锁
 }
 
-// NewGroup returns a new group instance
-func NewGroup(n string) *Group {
-	return &Group{
-		status:   groupStatusWorking,
-		name:     n,
+// NewGroup 构造函数
+func NewGroup(name string) *Group {
+	g := &Group{
+		name:     name,
 		sessions: make(map[int64]*session.Session),
 	}
+	g.status.Store(groupStatusWorking)
+	return g
 }
 
-// FindMember Find a member with customer filter
-func (c *Group) FindMember(filter func(ses *session.Session) bool) (*session.Session, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	for _, s := range c.sessions {
-		if filter(s) {
-			return s, nil
-		}
+// Add 往组中添加会话
+func (g *Group) Add(session *session.Session) error {
+	if g.isClosed() {
+		return ErrClosedGroup
 	}
 
-	return nil, ErrMemberNotFound
+	if env.Debug {
+		log.Info("Add session to group %s, ID=%d, UID=%d", g.name, session.ID(), session.UID())
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	id := session.ID()
+	_, ok := g.sessions[session.ID()]
+	if ok {
+		return ErrSessionDuplication
+	}
+
+	g.sessions[id] = session
+	return nil
 }
 
-// Member returns specified UID's session
-func (c *Group) Member(uid int64) (*session.Session, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+// Remove 从组中移除会话
+func (g *Group) Remove(s *session.Session) error {
+	if g.isClosed() {
+		return ErrClosedGroup
+	}
 
-	for _, s := range c.sessions {
+	if env.Debug {
+		log.Info("Remove session from group %s, UID=%d", g.name, s.UID())
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	delete(g.sessions, s.ID())
+	return nil
+}
+
+// Clear 删除组中的所有会话
+func (g *Group) Clear() error {
+	if g.isClosed() {
+		return ErrClosedGroup
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.sessions = make(map[int64]*session.Session)
+	return nil
+}
+
+// Count 获取组中会话的数量
+func (g *Group) Count() int {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	return len(g.sessions)
+}
+
+// Contains 检查组中是否包含指定 UID 的会话
+func (g *Group) Contains(uid int64) bool {
+	_, err := g.Member(uid)
+	return err == nil
+}
+
+// Members 获取组中所有会话的 UID 列表
+func (g *Group) Members() []int64 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var members []int64
+	for _, s := range g.sessions {
+		members = append(members, s.UID())
+	}
+
+	return members
+}
+
+// Member 获取指定 UID 的会话
+func (g *Group) Member(uid int64) (*session.Session, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	for _, s := range g.sessions {
 		if s.UID() == uid {
 			return s, nil
 		}
@@ -84,22 +149,23 @@ func (c *Group) Member(uid int64) (*session.Session, error) {
 	return nil, ErrMemberNotFound
 }
 
-// Members returns all member's UID in current group
-func (c *Group) Members() []int64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+// FindMember 查找满足指定条件的会话
+func (g *Group) FindMember(filter func(ses *session.Session) bool) (*session.Session, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 
-	var members []int64
-	for _, s := range c.sessions {
-		members = append(members, s.UID())
+	for _, s := range g.sessions {
+		if filter(s) {
+			return s, nil
+		}
 	}
 
-	return members
+	return nil, ErrMemberNotFound
 }
 
-// Multicast  push  the message to the filtered clients
-func (c *Group) Multicast(route string, v any, filter SessionFilter) error {
-	if c.isClosed() {
+// Multicast 将消息发送给满足过滤条件的会话
+func (g *Group) Multicast(route string, v any, filter SessionFilter) error {
+	if g.isClosed() {
 		return ErrClosedGroup
 	}
 
@@ -112,10 +178,10 @@ func (c *Group) Multicast(route string, v any, filter SessionFilter) error {
 		log.Info("Multicast %s, Data=%v", route, v)
 	}
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 
-	for _, s := range c.sessions {
+	for _, s := range g.sessions {
 		if !filter(s) {
 			continue
 		}
@@ -127,9 +193,9 @@ func (c *Group) Multicast(route string, v any, filter SessionFilter) error {
 	return nil
 }
 
-// Broadcast push  the message(s) to  all members
-func (c *Group) Broadcast(route string, v any) error {
-	if c.isClosed() {
+// Broadcast 将消息发送给组中的所有会话
+func (g *Group) Broadcast(route string, v any) error {
+	if g.isClosed() {
 		return ErrClosedGroup
 	}
 
@@ -142,10 +208,10 @@ func (c *Group) Broadcast(route string, v any) error {
 		log.Info("Broadcast %s, Data=%v", route, v)
 	}
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 
-	for _, s := range c.sessions {
+	for _, s := range g.sessions {
 		if err = s.Push(route, data); err != nil {
 			log.Error("Session push message error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
 		}
@@ -154,89 +220,18 @@ func (c *Group) Broadcast(route string, v any) error {
 	return err
 }
 
-// Contains check whether a UID is contained in current group or not
-func (c *Group) Contains(uid int64) bool {
-	_, err := c.Member(uid)
-	return err == nil
-}
-
-// Add add session to group
-func (c *Group) Add(session *session.Session) error {
-	if c.isClosed() {
-		return ErrClosedGroup
-	}
-
-	if env.Debug {
-		log.Info("Add session to group %s, ID=%d, UID=%d", c.name, session.ID(), session.UID())
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	id := session.ID()
-	_, ok := c.sessions[session.ID()]
-	if ok {
-		return ErrSessionDuplication
-	}
-
-	c.sessions[id] = session
-	return nil
-}
-
-// Leave remove specified UID related session from group
-func (c *Group) Leave(s *session.Session) error {
-	if c.isClosed() {
-		return ErrClosedGroup
-	}
-
-	if env.Debug {
-		log.Info("Remove session from group %s, UID=%d", c.name, s.UID())
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.sessions, s.ID())
-	return nil
-}
-
-// LeaveAll clear all sessions in the group
-func (c *Group) LeaveAll() error {
-	if c.isClosed() {
-		return ErrClosedGroup
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.sessions = make(map[int64]*session.Session)
-	return nil
-}
-
-// Count get current member amount in the group
-func (c *Group) Count() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return len(c.sessions)
-}
-
-func (c *Group) isClosed() bool {
-	if atomic.LoadInt32(&c.status) == groupStatusClosed {
-		return true
-	}
-	return false
-}
-
-// Close destroy group, which will release all resource in the group
-func (c *Group) Close() error {
-	if c.isClosed() {
+// Close 关闭组，释放所有资源
+func (g *Group) Close() error {
+	if !g.status.CompareAndSwap(groupStatusWorking, groupStatusClosed) {
 		return ErrCloseClosedGroup
 	}
 
-	atomic.StoreInt32(&c.status, groupStatusClosed)
-
 	// release all reference
-	c.sessions = make(map[int64]*session.Session)
+	g.sessions = make(map[int64]*session.Session)
 	return nil
+}
+
+// isClosed 组是否关闭
+func (g *Group) isClosed() bool {
+	return g.status.Load() == groupStatusClosed
 }
