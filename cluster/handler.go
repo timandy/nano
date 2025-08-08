@@ -195,7 +195,7 @@ func (h *LocalHandler) handleWS(conn *websocket.Conn) {
 
 // handle 循环读取数据包, 一个连接开启一个单独的写线程
 func (h *LocalHandler) handle(conn net.Conn) {
-	// create a client agent and startup write gorontine
+	// create a client agent and startup write goroutine
 	agt := newAgent(conn, h.pipeline, h.remoteProcess)
 	s := agt.session
 	h.node.saveSession(s.ID(), s)
@@ -446,34 +446,14 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 		log.Info("UID=%d, Message={%s}, Data=%v", session.UID(), msg.String(), msg.Data)
 	}
 
-	task := func() {
-		//标记, 写响应的时候使用
-		switch v := session.NetworkEntity().(type) {
-		case *agent:
-			v.lastMid = lastMid
-		case *acceptor:
-			v.lastMid = lastMid
-		}
-		//获取 Context
-		pool := &h.node.pool
-		c := pool.Get().(*npi.Context)
-		defer pool.Put(c)
-		c.Reset()
-		//初始化
-		c.Mid = lastMid
-		c.RoutePath = msg.Route
-		c.Service = service
-		c.Msg = msg
-		c.Session = session
-		//有路由
-		if handlerNode.Len() > 0 {
-			c.HandlerNode = handlerNode
-			c.Next()
-			return
-		}
-		//无路由
-		c.HandlerNode = h.allNoRoutes
-		c.Next()
+	// session 任务对象
+	task := &localHandlerTask{
+		localHandler: h,
+		handlerNode:  handlerNode,
+		session:      session,
+		msg:          msg,
+		service:      service,
+		lastMid:      lastMid,
 	}
 
 	// component 级别的执行器
@@ -485,7 +465,7 @@ func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64
 	}
 
 	// 按优先级调度任务
-	session.Execute(task, executorFactory)
+	session.Execute(task.run, executorFactory)
 }
 
 // findMembers 远程处理时, 查找服务对应的成员
