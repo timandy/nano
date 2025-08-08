@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -303,36 +302,20 @@ func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 
 // processMessage 处理消息, 分发到本地或远程
 func (h *LocalHandler) processMessage(agent *agent, msg *message.Message) {
-	var lastMid uint64
-	switch msg.Type {
-	case message.Request:
-		lastMid = msg.ID
-	case message.Notify:
-		lastMid = 0
-	default:
-		log.Info("Invalid message type: " + msg.Type.String())
+	if handlerNode, found := h.localHandlers[msg.Route]; found {
+		h.localProcess(agent.session, msg, handlerNode)
 		return
 	}
-	handlerNode, found := h.localHandlers[msg.Route]
-	if !found {
-		h.remoteProcess(agent.session, msg, false)
-	} else {
-		h.localProcess(handlerNode, lastMid, agent.session, msg)
-	}
+	h.remoteProcess(agent.session, msg, false)
 }
 
 // remoteProcess 处理远程消息
 func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Message, noCopy bool) {
-	index := strings.LastIndex(msg.Route, ".")
-	if index < 0 {
-		log.Info("nano/handler: invalid route %s", msg.Route)
-		return
-	}
-
-	service := msg.Route[:index]
+	service := msg.Service()
 	members := h.findMembers(service)
 	if len(members) == 0 {
-		log.Info("nano/handler: %s not found(forgot registered?)", msg.Route)
+		// 没有服务节点, 转本地处理 404
+		h.localProcess(session, msg, nil)
 		return
 	}
 
@@ -347,7 +330,11 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 		} else {
 			member := h.node.opts.RemoteServiceRoute(service, session, members)
 			if member == nil {
-				log.Info("customize remoteServiceRoute handler: %s is not found", msg.Route)
+				if env.Debug {
+					log.Info("customize remoteServiceRoute handler: %s is not found", msg.Route)
+				}
+				// 有服务节点, 但自定义路由没匹配到, 转本地处理 404
+				h.localProcess(session, msg, nil)
 				return
 			}
 			remoteAddr = member.ServiceAddr
@@ -407,21 +394,27 @@ func (h *LocalHandler) remoteProcess(session *session.Session, msg *message.Mess
 }
 
 // localProcess 本地处理
-func (h *LocalHandler) localProcess(handlerNode *npi.HandlerNode, lastMid uint64, session *session.Session, msg *message.Message) {
+func (h *LocalHandler) localProcess(session *session.Session, msg *message.Message, handlerNode *npi.HandlerNode) {
+	// 计算响应 ID
+	lastMid, err := msg.ResponseID()
+	if err != nil {
+		log.Info(err.Error() + ":" + msg.Type.String())
+		return
+	}
+
+	// 计算服务名
+	service := msg.Service()
+
+	// 执行管道任务
 	if pipe := h.pipeline; pipe != nil {
-		err := pipe.Inbound().Process(session, msg)
+		err = pipe.Inbound().Process(session, msg)
 		if err != nil {
 			log.Error("Pipeline process failed.", err)
 			return
 		}
 	}
-	index := strings.LastIndex(msg.Route, ".")
-	if index < 0 {
-		log.Info("nano/handler: invalid route %s", msg.Route)
-		return
-	}
-	service := msg.Route[:index]
 
+	// 记录日志
 	if env.Debug {
 		log.Info("UID=%d, Message={%s}, Data=%v", session.UID(), msg.String(), msg.Data)
 	}

@@ -35,7 +35,7 @@ func (w workerService) HandleRequest(_ context.Context, req *clusterpb.RequestMe
 		Route: req.Route,
 		Data:  req.Data,
 	}
-	w.node.handler.localProcess(handlerNode, req.Id, s, msg)
+	w.node.handler.localProcess(s, msg, handlerNode)
 	return &clusterpb.MemberHandleResponse{}, nil
 }
 
@@ -53,7 +53,7 @@ func (w workerService) HandleNotify(_ context.Context, req *clusterpb.NotifyMess
 		Route: req.Route,
 		Data:  req.Data,
 	}
-	w.node.handler.localProcess(handler, 0, s, msg)
+	w.node.handler.localProcess(s, msg, handler)
 	return &clusterpb.MemberHandleResponse{}, nil
 }
 

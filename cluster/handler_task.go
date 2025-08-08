@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"github.com/lonng/nano/internal/env"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/npi"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/session"
@@ -9,7 +11,7 @@ import (
 // 任务对象
 type localHandlerTask struct {
 	localHandler *LocalHandler
-	handlerNode  *npi.HandlerNode
+	handlerNode  *npi.HandlerNode // 只有该字段允许为 nil
 	session      *session.Session
 	msg          *message.Message
 	service      string
@@ -18,6 +20,7 @@ type localHandlerTask struct {
 
 // run 运行任务
 func (task *localHandlerTask) run() {
+	// 定义变量
 	h := task.localHandler
 	handlerNode := task.handlerNode
 	s := task.session
@@ -47,12 +50,15 @@ func (task *localHandlerTask) run() {
 	c.Msg = msg
 	c.Session = s
 	// 有路由
-	if handlerNode.Len() > 0 {
+	if handlerNode != nil && handlerNode.Len() > 0 {
 		c.HandlerNode = handlerNode
 		c.Next()
 		return
 	}
 	// 无路由
+	if env.Debug {
+		log.Info("nano/handler: %s not found(forgot registered?)", msg.Route)
+	}
 	c.HandlerNode = h.allNoRoutes
 	c.Next()
 }
