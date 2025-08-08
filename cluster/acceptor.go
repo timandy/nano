@@ -13,6 +13,7 @@ import (
 
 var _ session.NetworkEntity = (*acceptor)(nil)
 
+// acceptor 集群模式中, 工作节点的网络对象
 type acceptor struct {
 	sid        int64
 	node       *Node
@@ -23,7 +24,7 @@ type acceptor struct {
 	gateAddr   string
 }
 
-// 集群模式中, 工作节点的网络对象
+// newAcceptor 构造函数
 func newAcceptor(sid int64, node *Node, gateClient clusterpb.GateClient, rpcHandler rpcHandler, gateAddr string) *acceptor {
 	return &acceptor{
 		sid:        sid,
@@ -34,23 +35,17 @@ func newAcceptor(sid int64, node *Node, gateClient clusterpb.GateClient, rpcHand
 	}
 }
 
-// Push implements the session.NetworkEntity interface
-func (a *acceptor) Push(route string, v any) error {
-	// TODO: buffer
-	data, err := env.Marshal(v)
-	if err != nil {
-		return err
-	}
-	request := &clusterpb.PushMessage{
-		SessionId: a.sid,
-		Route:     route,
-		Data:      data,
-	}
-	_, err = a.gateClient.HandlePush(context.Background(), request)
-	return err
+// RemoteAddr 返回一个假的地址
+func (a *acceptor) RemoteAddr() net.Addr {
+	return mock.NetAddr{}
 }
 
-// RPC implements the session.NetworkEntity interface
+// LastMid 上次消息 ID
+func (a *acceptor) LastMid() uint64 {
+	return a.lastMid
+}
+
+// RPC 调用集群内的服务
 func (a *acceptor) RPC(route string, v any) error {
 	// TODO: buffer
 	data, err := env.Marshal(v)
@@ -66,17 +61,28 @@ func (a *acceptor) RPC(route string, v any) error {
 	return nil
 }
 
-// LastMid implements the session.NetworkEntity interface
-func (a *acceptor) LastMid() uint64 {
-	return a.lastMid
+// Push 调用 Gate, 推送数据给客户端
+func (a *acceptor) Push(route string, v any) error {
+	// TODO: buffer
+	data, err := env.Marshal(v)
+	if err != nil {
+		return err
+	}
+	request := &clusterpb.PushMessage{
+		SessionId: a.sid,
+		Route:     route,
+		Data:      data,
+	}
+	_, err = a.gateClient.HandlePush(context.Background(), request)
+	return err
 }
 
-// Response implements the session.NetworkEntity interface
+// Response 调用 Gate, 返回响应数据给客户端
 func (a *acceptor) Response(v any) error {
 	return a.ResponseMid(a.lastMid, v)
 }
 
-// ResponseMid implements the session.NetworkEntity interface
+// ResponseMid 调用 Gate, 返回响应数据给客户端
 func (a *acceptor) ResponseMid(mid uint64, v any) error {
 	// TODO: buffer
 	data, err := env.Marshal(v)
@@ -107,9 +113,4 @@ func (a *acceptor) Close() error {
 		s.Execute(func() { session.Event.FireSessionClosed(s) }) //异步执行关闭事件
 	}
 	return err
-}
-
-// RemoteAddr implements the session.NetworkEntity interface
-func (a *acceptor) RemoteAddr() net.Addr {
-	return mock.NetAddr{}
 }

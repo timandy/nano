@@ -20,11 +20,6 @@
 
 package mock
 
-import (
-	"fmt"
-	"net"
-)
-
 // NetAddr mock the net.Addr interface
 type NetAddr struct{}
 
@@ -33,90 +28,3 @@ func (a NetAddr) Network() string { return "mock" }
 
 // String implements the net.Addr interface
 func (a NetAddr) String() string { return "mock-addr" }
-
-type message struct {
-	route string
-	data  any
-}
-
-// NetworkEntity represents an network entity which can be used to construct the
-// session object.
-type NetworkEntity struct {
-	messages  []message
-	responses []any
-	msgmap    map[uint64]any
-	rpcCall   []message
-}
-
-// NewNetworkEntity returns an mock network entity
-func NewNetworkEntity() *NetworkEntity {
-	return &NetworkEntity{
-		msgmap: map[uint64]any{},
-	}
-}
-
-// RPC implements the session.NetworkEntity interface
-func (n *NetworkEntity) RPC(route string, v any) error {
-	n.rpcCall = append(n.rpcCall, message{route: route, data: v})
-	return nil
-}
-
-// Push implements the session.NetworkEntity interface
-func (n *NetworkEntity) Push(route string, v any) error {
-	n.messages = append(n.messages, message{route: route, data: v})
-	return nil
-}
-
-// LastMid implements the session.NetworkEntity interface
-func (n *NetworkEntity) LastMid() uint64 {
-	return 1
-}
-
-// Response implements the session.NetworkEntity interface
-func (n *NetworkEntity) Response(v any) error {
-	n.responses = append(n.responses, v)
-	return nil
-}
-
-// ResponseMid implements the session.NetworkEntity interface
-func (n *NetworkEntity) ResponseMid(mid uint64, v any) error {
-	_, found := n.msgmap[mid]
-	if found {
-		return fmt.Errorf("duplicated message id: %v", mid)
-	}
-	n.msgmap[mid] = v
-	return nil
-}
-
-// Close implements the session.NetworkEntity interface
-func (n *NetworkEntity) Close() error {
-	return nil
-}
-
-// RemoteAddr implements the session.NetworkEntity interface
-func (n *NetworkEntity) RemoteAddr() net.Addr {
-	return NetAddr{}
-}
-
-// LastResponse returns the last respond message
-func (n *NetworkEntity) LastResponse() any {
-	if len(n.responses) < 1 {
-		return nil
-	}
-	return n.responses[len(n.responses)-1]
-}
-
-// FindResponseByMID returns the response respective the message id
-func (n *NetworkEntity) FindResponseByMID(mid uint64) any {
-	return n.msgmap[mid]
-}
-
-// FindResponseByRoute returns the response respective the route
-func (n *NetworkEntity) FindResponseByRoute(route string) any {
-	for i := range n.messages {
-		if n.messages[i].route == route {
-			return n.messages[i].data
-		}
-	}
-	return nil
-}

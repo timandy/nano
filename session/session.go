@@ -31,17 +31,6 @@ import (
 	"github.com/lonng/nano/session/service"
 )
 
-// NetworkEntity represent low-level network instance
-type NetworkEntity interface {
-	Push(route string, v any) error
-	RPC(route string, v any) error
-	LastMid() uint64
-	Response(v any) error
-	ResponseMid(mid uint64, v any) error
-	Close() error
-	RemoteAddr() net.Addr
-}
-
 var (
 	//ErrIllegalUID 无效的 uid
 	ErrIllegalUID = errors.New("illegal uid")

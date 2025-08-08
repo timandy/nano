@@ -44,14 +44,13 @@ const (
 var (
 	// ErrBrokenPipe represents the low-level connection has broken.
 	ErrBrokenPipe = errors.New("broken low-level pipe")
-	// ErrBufferExceed indicates that the current session buffer is full and
-	// can not receive more data.
+	// ErrBufferExceed indicates that the current session buffer is full and can not receive more data.
 	ErrBufferExceed = errors.New("session send buffer exceed")
 )
 
 var _ session.NetworkEntity = (*agent)(nil)
 
-// Agent corresponding a user, used for store raw conn information
+// agent 与客户端直接通信的网络对象(单点模式中的节点, 或集群模式的网关)
 type agent struct {
 	// regular agent member
 	session    *session.Session    // session
@@ -67,6 +66,7 @@ type agent struct {
 	srv        reflect.Value       // cached session reflect.Value
 }
 
+// pendingMessage 待发送的消息
 type pendingMessage struct {
 	typ     message.Type // message type
 	route   string       // message route(push)
@@ -74,7 +74,7 @@ type pendingMessage struct {
 	payload any          // payload
 }
 
-// 与客户端直接通信的网络对象(单点模式中的节点, 或集群模式的网关)
+// newAgent 构造函数
 func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) *agent {
 	a := &agent{
 		conn:       conn,
@@ -94,22 +94,37 @@ func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) 
 	return a
 }
 
-func (a *agent) send(m pendingMessage) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			err = ErrBrokenPipe
-		}
-	}()
-	a.chSend <- m
-	return
+// RemoteAddr 客户端地址, 一般是上游负载均衡的地址
+func (a *agent) RemoteAddr() net.Addr {
+	return a.conn.RemoteAddr()
 }
 
-// LastMid implements the session.NetworkEntity interface
+// LastMid 上次消息 ID
 func (a *agent) LastMid() uint64 {
 	return a.lastMid
 }
 
-// Push implementation for session.NetworkEntity interface
+// RPC 调用集群内的服务
+func (a *agent) RPC(route string, v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
+
+	// TODO: buffer
+	data, err := env.Marshal(v)
+	if err != nil {
+		return err
+	}
+	msg := &message.Message{
+		Type:  message.Notify,
+		Route: route,
+		Data:  data,
+	}
+	a.rpcHandler(a.session, msg, true)
+	return nil
+}
+
+// Push 推送数据给客户端
 func (a *agent) Push(route string, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
@@ -131,34 +146,12 @@ func (a *agent) Push(route string, v any) error {
 	return a.send(pendingMessage{typ: message.Push, route: route, payload: v})
 }
 
-// RPC implementation for session.NetworkEntity interface
-func (a *agent) RPC(route string, v any) error {
-	if a.status() == statusClosed {
-		return ErrBrokenPipe
-	}
-
-	// TODO: buffer
-	data, err := env.Marshal(v)
-	if err != nil {
-		return err
-	}
-	msg := &message.Message{
-		Type:  message.Notify,
-		Route: route,
-		Data:  data,
-	}
-	a.rpcHandler(a.session, msg, true)
-	return nil
-}
-
-// Response implementation for session.NetworkEntity interface
-// Response message to session
+// Response 返回响应数据给客户端
 func (a *agent) Response(v any) error {
 	return a.ResponseMid(a.lastMid, v)
 }
 
-// ResponseMid implementation for session.NetworkEntity interface
-// Response message to session
+// ResponseMid 返回响应数据给客户端
 func (a *agent) ResponseMid(mid uint64, v any) error {
 	if a.status() == statusClosed {
 		return ErrBrokenPipe
@@ -184,9 +177,7 @@ func (a *agent) ResponseMid(mid uint64, v any) error {
 	return a.send(pendingMessage{typ: message.Response, mid: mid, payload: v})
 }
 
-// Close implementation for session.NetworkEntity interface
-// Close closes the agent, clean inner state and close low-level connection.
-// Any blocked Read or Write operations will be unblocked and return errors.
+// Close 关闭低级连接, 任何被阻塞读取或写入作都将被取消阻塞并返回错误
 func (a *agent) Close() error {
 	if a.status() == statusClosed {
 		return ErrCloseClosedSession
@@ -197,7 +188,7 @@ func (a *agent) Close() error {
 		log.Info("Session closed, ID=%d, UID=%d, IP=%s", a.session.ID(), a.session.UID(), a.conn.RemoteAddr())
 	}
 
-	// prevent closing closed channel
+	// 防止关闭已经是关闭状态的 chan
 	select {
 	case <-a.chDie:
 		// expect
@@ -208,24 +199,22 @@ func (a *agent) Close() error {
 	return a.conn.Close()
 }
 
-// RemoteAddr implementation for session.NetworkEntity interface returns the remote network address.
-func (a *agent) RemoteAddr() net.Addr {
-	return a.conn.RemoteAddr()
-}
-
-// String, implementation for Stringer interface
+// String 返回描述信息
 func (a *agent) String() string {
 	return fmt.Sprintf("Remote=%s, LastTime=%d", a.conn.RemoteAddr().String(), atomic.LoadInt64(&a.lastAt))
 }
 
+// status 获取当前状态
 func (a *agent) status() int32 {
 	return a.state.Load()
 }
 
+// setStatus 设置状态
 func (a *agent) setStatus(state int32) {
 	a.state.Store(state)
 }
 
+// write 连接的 write 协程的任务
 func (a *agent) write() {
 	heartbeat := env.HeartbeatInterval
 	ticker := scheduler.Heartbeat.NewTicker(heartbeat)
@@ -285,29 +274,18 @@ func (a *agent) write() {
 	}
 }
 
-// 关闭连接之前, 将所有待发送的消息写入底层连接
-func (a *agent) flush(chWrite <-chan []byte) {
-	// 处理写入任务
-	for data := range chWrite {
-		err := a.writeData(data)
-		if err != nil {
-			return // 底层连接断开, 退出写入
+// send 将消息放入待发送队列
+func (a *agent) send(m pendingMessage) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = ErrBrokenPipe
 		}
-	}
-	// 处理封包和写入任务
-	for msg := range a.chSend {
-		data := a.packMsg(msg)
-		if len(data) == 0 {
-			continue // 忽略封包失败错误
-		}
-		err := a.writeData(data)
-		if err != nil {
-			return // 底层连接断开, 退出写入
-		}
-	}
+	}()
+	a.chSend <- m
+	return
 }
 
-// packMsg 封包
+// packMsg 将消息封装成可直接写入底层连接的数据包
 func (a *agent) packMsg(data pendingMessage) []byte {
 	// 序列化
 	payload, err := env.Marshal(data.payload)
@@ -354,6 +332,28 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 		return nil
 	}
 	return p
+}
+
+// flush 关闭连接之前, 将所有待发送的消息写入底层连接
+func (a *agent) flush(chWrite <-chan []byte) {
+	// 处理写入任务
+	for data := range chWrite {
+		err := a.writeData(data)
+		if err != nil {
+			return // 底层连接断开, 退出写入
+		}
+	}
+	// 处理封包和写入任务
+	for msg := range a.chSend {
+		data := a.packMsg(msg)
+		if len(data) == 0 {
+			continue // 忽略封包失败错误
+		}
+		err := a.writeData(data)
+		if err != nil {
+			return // 底层连接断开, 退出写入
+		}
+	}
 }
 
 // writeData 将封好的包写入底层连接
