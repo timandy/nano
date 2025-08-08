@@ -25,7 +25,6 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/scheduler/schedulerapi"
@@ -44,35 +43,60 @@ type NetworkEntity interface {
 }
 
 var (
-	//ErrIllegalUID represents a invalid uid
+	//ErrIllegalUID 无效的 uid
 	ErrIllegalUID = errors.New("illegal uid")
 )
 
 // Session 会话表示一个客户端会话，可以在低级保持连接期间存储临时数据，当低级连接断开时，所有数据都会被释放。
 // 与客户端相关的会话实例将作为第一个参数传递给构造函数。
 type Session struct {
-	id         int64                 // session global unique id
-	uid        int64                 // binding user id
-	lastTime   int64                 // last heartbeat time
-	entity     NetworkEntity         // low-level network entity
-	data       map[string]any        // session data store
-	dataMu     sync.RWMutex          // protect data
-	executor   schedulerapi.Executor // executor for session tasks
-	executorMu sync.RWMutex          // read write executor lock
-	router     *Router               // routing table
+	id         int64                 // 会话 ID(集群模式下, worker 节点中 Node.sessions 中 key 不是该 id)
+	uid        atomic.Int64          // 绑定的用户 ID
+	entity     NetworkEntity         // 底层网络对象
+	router     *Router               // 路由表(service->addr)
+	data       map[string]any        // 会话数据
+	dataMu     sync.RWMutex          // 会话数据锁
+	executor   schedulerapi.Executor // 执行器
+	executorMu sync.RWMutex          // 读写 executor 字段锁
+	runMu      sync.Mutex            // 并行锁, 防止同会话不同请求调度到各自 executor 并发执行, 造成数据错乱(例如 lastMid 设置)
 }
 
 // New 返回新的会话实例 NetworkEntity 是低级网络实例
 func New(entity NetworkEntity) *Session {
 	s := &Session{
-		id:       service.Connections.SessionID(),
-		entity:   entity,
-		data:     make(map[string]any),
-		lastTime: time.Now().Unix(),
-		router:   newRouter(),
+		id:     service.Connections.SessionID(),
+		entity: entity,
+		router: newRouter(),
+		data:   make(map[string]any),
 	}
 	Event.FireSessionCreated(s)
 	return s
+}
+
+//==================== 属性 ====================
+
+// ID 返回会话 ID
+func (s *Session) ID() int64 {
+	return s.id
+}
+
+// Bind 绑定用户 ID 到当前会话
+func (s *Session) Bind(uid int64) error {
+	if uid <= 0 {
+		return ErrIllegalUID
+	}
+	s.uid.Store(uid)
+	return nil
+}
+
+// UID 返回当前会话绑定的用户 ID
+func (s *Session) UID() int64 {
+	return s.uid.Load()
+}
+
+// LastMid 返回最后一个消息 ID
+func (s *Session) LastMid() uint64 {
+	return s.entity.LastMid()
 }
 
 // NetworkEntity 返回低级网络代理对象
@@ -80,10 +104,76 @@ func (s *Session) NetworkEntity() NetworkEntity {
 	return s.entity
 }
 
-// Router returns the service router
+// Router 返回当前会话的路由表
 func (s *Session) Router() *Router {
 	return s.router
 }
+
+// RemoteAddr returns the remote network address.
+func (s *Session) RemoteAddr() net.Addr {
+	return s.entity.RemoteAddr()
+}
+
+//==================== 调度 ====================
+
+// BindExecutor 绑定执行器
+func (s *Session) BindExecutor(executor schedulerapi.Executor) {
+	if executor == nil {
+		return
+	}
+
+	s.executorMu.Lock()
+	defer s.executorMu.Unlock()
+
+	s.executor = executor
+}
+
+// Execute 执行任务
+func (s *Session) Execute(task func(), executorFactory ...func() schedulerapi.Executor) {
+	// session 级别的执行器
+	executor := s.getExecutor()
+	if executor != nil && executor.Execute(task) {
+		return
+	}
+	// 外部传入的执行器, 一般是 component 级别的执行器
+	for _, fac := range executorFactory {
+		if fac == nil {
+			continue
+		}
+		executor = fac()
+		if executor != nil && executor.Execute(task) {
+			return
+		}
+	}
+	// 全局级别执行器
+	scheduler.Execute(task)
+}
+
+// LockUnlock 锁定会话, 并返回一个解锁函数, defer s.LockUnlock()()
+func (s *Session) LockUnlock() func() {
+	s.runMu.Lock()
+	return func() {
+		s.runMu.Unlock()
+	}
+}
+
+// getExecutor 获取当前会话的执行器
+func (s *Session) getExecutor() schedulerapi.Executor {
+	s.executorMu.RLock()
+	defer s.executorMu.RUnlock()
+
+	return s.executor
+}
+
+// clearExecutor 清除执行器绑定
+func (s *Session) clearExecutor() {
+	s.executorMu.Lock()
+	defer s.executorMu.Unlock()
+
+	s.executor = nil
+}
+
+//==================== 通信 ====================
 
 // RPC 将消息发送到远程服务器
 func (s *Session) RPC(route string, v any) error {
@@ -114,37 +204,9 @@ func (s *Session) ResponseMID(mid uint64, v any) error {
 	return s.entity.ResponseMid(mid, v)
 }
 
-// ID returns the session id
-func (s *Session) ID() int64 {
-	return s.id
-}
+//==================== 数据 ====================
 
-// UID returns uid that bind to current session
-func (s *Session) UID() int64 {
-	return atomic.LoadInt64(&s.uid)
-}
-
-// LastMid returns the last message id
-func (s *Session) LastMid() uint64 {
-	return s.entity.LastMid()
-}
-
-// Bind bind UID to current session
-func (s *Session) Bind(uid int64) error {
-	if uid < 1 {
-		return ErrIllegalUID
-	}
-
-	atomic.StoreInt64(&s.uid, uid)
-	return nil
-}
-
-// RemoteAddr returns the remote network address.
-func (s *Session) RemoteAddr() net.Addr {
-	return s.entity.RemoteAddr()
-}
-
-// Remove delete data associated with the key from session storage
+// Remove 删除与 key 关联的值
 func (s *Session) Remove(key string) {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
@@ -152,7 +214,7 @@ func (s *Session) Remove(key string) {
 	delete(s.data, key)
 }
 
-// Set associates value with the key in session storage
+// Set 设置与 key 关联的值
 func (s *Session) Set(key string, value any) {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
@@ -160,7 +222,7 @@ func (s *Session) Set(key string, value any) {
 	s.data[key] = value
 }
 
-// HasKey decides whether a key has associated value
+// HasKey 获取是否设置了与 key 关联的值
 func (s *Session) HasKey(key string) bool {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -169,7 +231,15 @@ func (s *Session) HasKey(key string) bool {
 	return has
 }
 
-// Int returns the value associated with the key as a int.
+// Value 返回与 key 关联的值
+func (s *Session) Value(key string) any {
+	s.dataMu.RLock()
+	defer s.dataMu.RUnlock()
+
+	return s.data[key]
+}
+
+// Int 返回与 key 关联的值，类型为 int
 func (s *Session) Int(key string) int {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -186,7 +256,7 @@ func (s *Session) Int(key string) int {
 	return value
 }
 
-// Int8 returns the value associated with the key as a int8.
+// Int8 返回与 key 关联的值，类型为 int8
 func (s *Session) Int8(key string) int8 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -203,7 +273,7 @@ func (s *Session) Int8(key string) int8 {
 	return value
 }
 
-// Int16 returns the value associated with the key as a int16.
+// Int16 返回与 key 关联的值，类型为 int16
 func (s *Session) Int16(key string) int16 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -220,7 +290,7 @@ func (s *Session) Int16(key string) int16 {
 	return value
 }
 
-// Int32 returns the value associated with the key as a int32.
+// Int32 返回与 key 关联的值，类型为 int32
 func (s *Session) Int32(key string) int32 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -237,7 +307,7 @@ func (s *Session) Int32(key string) int32 {
 	return value
 }
 
-// Int64 returns the value associated with the key as a int64.
+// Int64 返回与 key 关联的值，类型为 int64
 func (s *Session) Int64(key string) int64 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -254,7 +324,7 @@ func (s *Session) Int64(key string) int64 {
 	return value
 }
 
-// Uint returns the value associated with the key as a uint.
+// Uint 返回与 key 关联的值，类型为 uint
 func (s *Session) Uint(key string) uint {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -271,7 +341,7 @@ func (s *Session) Uint(key string) uint {
 	return value
 }
 
-// Uint8 returns the value associated with the key as a uint8.
+// Uint8 返回与 key 关联的值，类型为 uint8
 func (s *Session) Uint8(key string) uint8 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -288,7 +358,7 @@ func (s *Session) Uint8(key string) uint8 {
 	return value
 }
 
-// Uint16 returns the value associated with the key as a uint16.
+// Uint16 返回与 key 关联的值，类型为 uint16
 func (s *Session) Uint16(key string) uint16 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -305,7 +375,7 @@ func (s *Session) Uint16(key string) uint16 {
 	return value
 }
 
-// Uint32 returns the value associated with the key as a uint32.
+// Uint32 返回与 key 关联的值，类型为 uint32
 func (s *Session) Uint32(key string) uint32 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -322,7 +392,7 @@ func (s *Session) Uint32(key string) uint32 {
 	return value
 }
 
-// Uint64 returns the value associated with the key as a uint64.
+// Uint64 返回与 key 关联的值，类型为 uint64
 func (s *Session) Uint64(key string) uint64 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -339,7 +409,7 @@ func (s *Session) Uint64(key string) uint64 {
 	return value
 }
 
-// Float32 returns the value associated with the key as a float32.
+// Float32 返回与 key 关联的值，类型为 float32
 func (s *Session) Float32(key string) float32 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -356,7 +426,7 @@ func (s *Session) Float32(key string) float32 {
 	return value
 }
 
-// Float64 returns the value associated with the key as a float64.
+// Float64 返回与 key 关联的值，类型为 float64
 func (s *Session) Float64(key string) float64 {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -373,7 +443,7 @@ func (s *Session) Float64(key string) float64 {
 	return value
 }
 
-// String returns the value associated with the key as a string.
+// String 返回与 key 关联的值，类型为 string
 func (s *Session) String(key string) string {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -390,15 +460,7 @@ func (s *Session) String(key string) string {
 	return value
 }
 
-// Value returns the value associated with the key as a any.
-func (s *Session) Value(key string) any {
-	s.dataMu.RLock()
-	defer s.dataMu.RUnlock()
-
-	return s.data[key]
-}
-
-// State 返回所有会话所有数据
+// State 返回会话关联的所有键值对
 func (s *Session) State() map[string]any {
 	s.dataMu.RLock()
 	defer s.dataMu.RUnlock()
@@ -406,7 +468,7 @@ func (s *Session) State() map[string]any {
 	return s.data
 }
 
-// Restore 重新连接后的会话数据
+// Restore 设置会话关联的所有键值对
 func (s *Session) Restore(data map[string]any) {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
@@ -414,65 +476,24 @@ func (s *Session) Restore(data map[string]any) {
 	s.data = data
 }
 
-// Clear 释放与当前会话相关的所有数据
-func (s *Session) Clear() {
+// clearData 清除所有绑定的键值对
+func (s *Session) clearData() {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
 
-	atomic.StoreInt64(&s.uid, 0)
 	s.data = map[string]any{}
+}
+
+//==================== 终止 ====================
+
+// Clear 释放与当前会话相关的所有数据(uid, 键值对, 执行器)
+func (s *Session) Clear() {
+	s.uid.Store(0)
+	s.clearData()
+	s.clearExecutor()
 }
 
 // Close 终止当前会话，会话相关数据将不会被释放，所有相关数据都应在会话关闭回调中显式清除
 func (s *Session) Close() {
 	_ = s.entity.Close()
-}
-
-// BindExecutor 绑定执行器
-func (s *Session) BindExecutor(executor schedulerapi.Executor) {
-	if executor == nil {
-		return
-	}
-
-	s.executorMu.Lock()
-	defer s.executorMu.Unlock()
-
-	s.executor = executor
-}
-
-// UnbindExecutor 解除执行器
-func (s *Session) UnbindExecutor() {
-	s.executorMu.Lock()
-	defer s.executorMu.Unlock()
-
-	s.executor = nil
-}
-
-// Execute 执行任务
-func (s *Session) Execute(task func(), executorFactory ...func() schedulerapi.Executor) {
-	// session 级别的执行器
-	executor := s.getExecutor()
-	if executor != nil && executor.Execute(task) {
-		return
-	}
-	// 外部传入的执行器, 一般是 component 级别的执行器
-	for _, fac := range executorFactory {
-		if fac == nil {
-			continue
-		}
-		executor = fac()
-		if executor != nil && executor.Execute(task) {
-			return
-		}
-	}
-	// 全局级别执行器
-	scheduler.Execute(task)
-}
-
-// getExecutor 获取当前会话的执行器
-func (s *Session) getExecutor() schedulerapi.Executor {
-	s.executorMu.RLock()
-	defer s.executorMu.RUnlock()
-
-	return s.executor
 }
