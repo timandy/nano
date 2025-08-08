@@ -18,12 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package io
+package ws
 
 import (
-	"net"
+	"fmt"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/packet"
@@ -48,15 +49,14 @@ func init() {
 	}
 }
 
+//goland:noinspection GoNameStartsWithPackageName
 type (
-
-	// Callback represents the callback type which will be called
-	// when the correspond events is occurred.
+	// Callback represents the callback type which will be called when the correspond events is occurred.
 	Callback func(data any)
 
-	// Connector is a tiny Nano client
-	Connector struct {
-		conn   net.Conn        // low-level connection
+	// WsConnector is a tiny Nano client
+	WsConnector struct {
+		conn   *websocket.Conn // low-level connection
 		codec  *packet.Decoder // decoder
 		die    chan struct{}   // connector close channel
 		chSend chan []byte     // send queue
@@ -74,9 +74,9 @@ type (
 	}
 )
 
-// NewConnector create a new Connector
-func NewConnector() *Connector {
-	return &Connector{
+// NewWsConnector create a new WsConnector
+func NewWsConnector() *WsConnector {
+	return &WsConnector{
 		die:       make(chan struct{}),
 		codec:     packet.NewDecoder(),
 		chSend:    make(chan []byte, 64),
@@ -87,8 +87,8 @@ func NewConnector() *Connector {
 }
 
 // Start connect to the server and send/recv between the c/s
-func (c *Connector) Start(addr string) error {
-	conn, err := net.Dial("tcp", addr)
+func (c *WsConnector) Start(addr string) error {
+	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%v/ws", addr), nil)
 	if err != nil {
 		return err
 	}
@@ -107,12 +107,12 @@ func (c *Connector) Start(addr string) error {
 }
 
 // OnConnected set the callback which will be called when the client connected to the server
-func (c *Connector) OnConnected(callback func()) {
+func (c *WsConnector) OnConnected(callback func()) {
 	c.connectedCallback = callback
 }
 
 // Request send a request to server and register a callbck for the response
-func (c *Connector) Request(route string, v proto.Message, callback Callback) error {
+func (c *WsConnector) Request(route string, v proto.Message, callback Callback) error {
 	data, err := serialize(v)
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (c *Connector) Request(route string, v proto.Message, callback Callback) er
 }
 
 // Notify send a notification to server
-func (c *Connector) Notify(route string, v proto.Message) error {
+func (c *WsConnector) Notify(route string, v proto.Message) error {
 	data, err := serialize(v)
 	if err != nil {
 		return err
@@ -150,20 +150,20 @@ func (c *Connector) Notify(route string, v proto.Message) error {
 }
 
 // On add the callback for the event
-func (c *Connector) On(event string, callback Callback) {
+func (c *WsConnector) On(event string, callback Callback) {
 	c.muEvents.Lock()
 	defer c.muEvents.Unlock()
 
 	c.events[event] = callback
 }
 
-// Close close the connection, and shutdown the benchmark
-func (c *Connector) Close() {
-	c.conn.Close()
+// Close the connection, and shutdown the benchmark
+func (c *WsConnector) Close() {
+	_ = c.conn.Close()
 	close(c.die)
 }
 
-func (c *Connector) eventHandler(event string) (Callback, bool) {
+func (c *WsConnector) eventHandler(event string) (Callback, bool) {
 	c.muEvents.RLock()
 	defer c.muEvents.RUnlock()
 
@@ -171,7 +171,7 @@ func (c *Connector) eventHandler(event string) (Callback, bool) {
 	return cb, ok
 }
 
-func (c *Connector) responseHandler(mid uint64) (Callback, bool) {
+func (c *WsConnector) responseHandler(mid uint64) (Callback, bool) {
 	c.muResponses.RLock()
 	defer c.muResponses.RUnlock()
 
@@ -179,7 +179,7 @@ func (c *Connector) responseHandler(mid uint64) (Callback, bool) {
 	return cb, ok
 }
 
-func (c *Connector) setResponseHandler(mid uint64, cb Callback) {
+func (c *WsConnector) setResponseHandler(mid uint64, cb Callback) {
 	c.muResponses.Lock()
 	defer c.muResponses.Unlock()
 
@@ -190,7 +190,7 @@ func (c *Connector) setResponseHandler(mid uint64, cb Callback) {
 	}
 }
 
-func (c *Connector) sendMessage(msg *message.Message) error {
+func (c *WsConnector) sendMessage(msg *message.Message) error {
 	data, err := msg.Encode()
 	if err != nil {
 		return err
@@ -209,13 +209,13 @@ func (c *Connector) sendMessage(msg *message.Message) error {
 	return nil
 }
 
-func (c *Connector) write() {
+func (c *WsConnector) write() {
 	defer close(c.chSend)
 
 	for {
 		select {
 		case data := <-c.chSend:
-			if _, err := c.conn.Write(data); err != nil {
+			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				log.Error(err.Error())
 				c.Close()
 			}
@@ -226,22 +226,20 @@ func (c *Connector) write() {
 	}
 }
 
-func (c *Connector) send(data []byte) {
+func (c *WsConnector) send(data []byte) {
 	c.chSend <- data
 }
 
-func (c *Connector) read() {
-	buf := make([]byte, 2048)
-
+func (c *WsConnector) read() {
 	for {
-		n, err := c.conn.Read(buf)
+		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
 			log.Error(err.Error())
 			c.Close()
 			return
 		}
 
-		packets, err := c.codec.Decode(buf[:n])
+		packets, err := c.codec.Decode(buf)
 		if err != nil {
 			log.Error(err.Error())
 			c.Close()
@@ -255,7 +253,7 @@ func (c *Connector) read() {
 	}
 }
 
-func (c *Connector) processPacket(p *packet.Packet) {
+func (c *WsConnector) processPacket(p *packet.Packet) {
 	switch p.Type {
 	case packet.Handshake:
 		c.send(had)
@@ -273,7 +271,7 @@ func (c *Connector) processPacket(p *packet.Packet) {
 	}
 }
 
-func (c *Connector) processMessage(msg *message.Message) {
+func (c *WsConnector) processMessage(msg *message.Message) {
 	switch msg.Type {
 	case message.Push:
 		cb, ok := c.eventHandler(msg.Route)

@@ -1,7 +1,7 @@
 //go:build benchmark
 // +build benchmark
 
-package io
+package tcp
 
 import (
 	"os"
@@ -56,7 +56,7 @@ func server() {
 	components := &component.Components{}
 	components.Register(NewTestHandler())
 
-	e := nano.New(nano.WithDebugMode(),
+	e := nano.New(
 		nano.WithSerializer(protobuf.NewSerializer()),
 		nano.WithComponents(components),
 	)
@@ -64,7 +64,7 @@ func server() {
 }
 
 func client() {
-	c := NewConnector()
+	c := NewTcpConnector()
 
 	chReady := make(chan struct{})
 	c.OnConnected(func() {

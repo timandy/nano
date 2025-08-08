@@ -1,11 +1,12 @@
 //go:build benchmark
 // +build benchmark
 
-package ws
+package io
 
 import (
 	"os"
 	"os/signal"
+	"strconv"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -14,19 +15,39 @@ import (
 	"github.com/lonng/nano"
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/protocal/serialize/protobuf"
+	"github.com/lonng/nano/scheduler/defscheduler"
+	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session"
+	"github.com/lonng/nano/test/benchmark/tcp"
 	"github.com/lonng/nano/test/benchmark/testdata"
 )
 
 const (
-	addr = "127.0.0.1:13250" // local address
-	conc = 1000              // concurrent client count
+	addr          = "127.0.0.1:13250" // local address
+	conc          = 2000              // concurrent client count
+	routine_count = 500               // number of executors
 )
 
 type TestHandler struct {
 	component.Base
 	metrics int32
 	group   *nano.Group
+}
+
+// 多协程演示
+func (h *TestHandler) Init() {
+	var executors []schedulerapi.Executor
+	for i := 0; i < routine_count; i++ {
+		scheduler := defscheduler.NewScheduler("executor"+strconv.Itoa(routine_count), time.Second)
+		scheduler.Start()
+		executors = append(executors, scheduler)
+	}
+
+	// 实际情况可按照一个房间一个协程
+	session.Event.SessionCreated(func(s *session.Session) {
+		idx := s.ID() % routine_count
+		s.BindExecutor(executors[idx])
+	})
 }
 
 func (h *TestHandler) AfterInit() {
@@ -49,6 +70,7 @@ func NewTestHandler() *TestHandler {
 
 func (h *TestHandler) Ping(s *session.Session, data *testdata.Ping) error {
 	atomic.AddInt32(&h.metrics, 1)
+	time.Sleep(30 * time.Millisecond) //添加耗时操作
 	return s.Push("pong", &testdata.Pong{Content: data.Content})
 }
 
@@ -56,15 +78,15 @@ func server() {
 	components := &component.Components{}
 	components.Register(NewTestHandler())
 
-	e := nano.New(nano.WithDebugMode(),
+	e := nano.New(
 		nano.WithSerializer(protobuf.NewSerializer()),
 		nano.WithComponents(components),
 	)
-	_ = e.RunWs(addr, "/ws")
+	_ = e.RunTcp(addr)
 }
 
 func client() {
-	c := NewConnector()
+	c := tcp.NewTcpConnector()
 
 	chReady := make(chan struct{})
 	c.OnConnected(func() {

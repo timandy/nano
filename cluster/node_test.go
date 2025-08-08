@@ -89,7 +89,7 @@ func TestNodeStartup(t *testing.T) {
 	assert.Equal(t, member2Handler.RemoteService(), []string{"GateComponent", "MasterComponent"})
 
 	//客户端
-	connector := ws.NewConnector()
+	connector := ws.NewWsConnector()
 
 	chWait := make(chan struct{})
 	connector.OnConnected(func() {
