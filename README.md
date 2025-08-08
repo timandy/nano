@@ -52,18 +52,18 @@ The Nano will remain simple, but you can perform any operations in the component
 
 #### How to execute the asynchronous task
 
-```golang
+```go
 func (manager *PlayerManager) Login(s *session.Session, msg *ReqPlayerLogin) error {
     var onDBResult = func(player *Player) {
         manager.players = append(manager.players, player)
         s.Push("PlayerSystem.LoginSuccess", &ResPlayerLogin)
     }
-    
+
     // run slow task in new gorontine
     go func() {
         player, err := db.QueryPlayer(msg.PlayerId) // ignore error in demo
         // handle result in main logical gorontine
-        nano.Invoke(func(){ onDBResult(player) })
+        s.Execute(func() { onDBResult(player) })
     }
     return nil
 }
@@ -147,11 +147,11 @@ go test -v ./...
 # Other:  ...
 
 # Single business goroutine
-cd ./test/benchmark/io
+cd ./test/benchmark/tcp
 go test -v -tags "benchmark"
 
 # Multiple business goroutines
-cd ./test/benchmark/io_multi_routine
+cd ./test/benchmark/tcp_multi_routine
 go test -v -tags "benchmark"
 ```
 
