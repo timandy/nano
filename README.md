@@ -146,7 +146,12 @@ go test -v ./...
 # Device: i5-6500 3.2GHz 4 Core/1000-Concurrent => IOPS 11W(Average)
 # Other:  ...
 
+# Single business goroutine
 cd ./test/benchmark/io
+go test -v -tags "benchmark"
+
+# Multiple business goroutines
+cd ./test/benchmark/io_multi_routine
 go test -v -tags "benchmark"
 ```
 
