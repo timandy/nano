@@ -421,3 +421,48 @@ func TestTicker_Constructors(t *testing.T) {
 		assert.NotNil(t, ticker)
 	})
 }
+
+// TestTimer_AutoClean 测试定时器自动清理功能
+func TestTimer_AutoClean(t *testing.T) {
+	s := NewScheduler("test", time.Millisecond, 4)
+	s.Start()
+	// 创建一个定时器, 设置 fnClean 函数
+	var cnt atomic.Int32
+	tmr := s.NewTimer(time.Hour, func() {})
+	tmrRaw := tmr.(*timer)
+	tmrRaw.fnClean = func() {
+		cnt.Add(1)
+	}
+	s.Close()
+	// 调度器关闭后, fnClean 执行了一次
+	assert.Eventually(t, func() bool {
+		return cnt.Load() == 1
+	}, 100*time.Millisecond, time.Millisecond)
+	// 等待, 确认不会再次执行 fnClean
+	time.Sleep(100 * time.Millisecond)
+	assert.EqualValues(t, 1, cnt.Load())
+}
+
+// TestTimer_DelayClean 测试定时器延迟清理功能
+func TestTimer_DelayClean(t *testing.T) {
+	s := NewScheduler("test", time.Millisecond, 4)
+	s.Start()
+	// 创建一个定时器, 设置 fnClean 函数
+	tmr := s.NewTimer(time.Hour, func() {})
+	tmrRaw := tmr.(*timer)
+	var cnt atomic.Int32
+	tmrRaw.fnClean = func() {
+		cnt.Add(1)
+	}
+	tmr.Stop()
+	assert.True(t, tmr.Stopped())
+	// 定时器关闭后, fnClean 执行了一次
+	assert.Eventually(t, func() bool {
+		return cnt.Load() == 1
+	}, 100*time.Millisecond, time.Millisecond)
+	// 关闭调度器
+	s.Close()
+	// 调度器关闭后不会重复 执行 fnClean
+	time.Sleep(100 * time.Millisecond)
+	assert.EqualValues(t, 1, cnt.Load())
+}

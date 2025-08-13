@@ -17,7 +17,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -32,7 +31,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -52,7 +50,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -70,21 +67,21 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  5,
 		}
+		tm.current.Store(5)
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
 		}
 
 		slt := tm.next()
 		assert.Equal(t, tm.slots[5], slt)
-		assert.Equal(t, int64(6), tm.current)
+		assert.Equal(t, int64(6), tm.current.Load())
 
 		// 测试环绕
-		tm.current = 15
+		tm.current.Store(15)
 		slt = tm.next()
 		assert.Equal(t, tm.slots[15], slt)
-		assert.Equal(t, int64(0), tm.current)
+		assert.Equal(t, int64(0), tm.current.Load())
 	})
 
 	t.Run("Advance with empty slot", func(t *testing.T) {
@@ -92,7 +89,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -103,7 +99,7 @@ func TestTimerManager(t *testing.T) {
 
 		// 空槽位不应该panic
 		tm.advance(s)
-		assert.Equal(t, int64(1), tm.current)
+		assert.Equal(t, int64(1), tm.current.Load())
 	})
 
 	t.Run("Advance with stopped timer", func(t *testing.T) {
@@ -111,7 +107,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -136,7 +131,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -161,7 +155,6 @@ func TestTimerManager(t *testing.T) {
 			tick:     int64(time.Millisecond),
 			slotMask: 15,
 			slots:    make([]*slot, 16),
-			current:  0,
 		}
 		for i := 0; i < 16; i++ {
 			tm.slots[i] = &slot{}
@@ -186,7 +179,6 @@ func TestTimerManager_NewTimerMethods(t *testing.T) {
 		tick:     int64(time.Millisecond),
 		slotMask: 15,
 		slots:    make([]*slot, 16),
-		current:  0,
 	}
 	for i := 0; i < 16; i++ {
 		tm.slots[i] = &slot{}
@@ -238,7 +230,6 @@ func TestTimerManager_TickerMethods(t *testing.T) {
 		tick:     int64(time.Millisecond),
 		slotMask: 15,
 		slots:    make([]*slot, 16),
-		current:  0,
 	}
 	for i := 0; i < 16; i++ {
 		tm.slots[i] = &slot{}
@@ -298,7 +289,6 @@ func TestTimerManager_ConcurrentAddTimer(t *testing.T) {
 		tick:     int64(time.Millisecond),
 		slotMask: 15,
 		slots:    make([]*slot, 16),
-		current:  0,
 	}
 	for i := 0; i < 16; i++ {
 		tm.slots[i] = &slot{}
@@ -343,7 +333,6 @@ func TestTimerManager_ErrorCases(t *testing.T) {
 		tick:     int64(time.Millisecond),
 		slotMask: 15,
 		slots:    make([]*slot, 16),
-		current:  0,
 	}
 	for i := 0; i < 16; i++ {
 		tm.slots[i] = &slot{}

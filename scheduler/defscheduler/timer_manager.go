@@ -72,6 +72,12 @@ func (tm *timerManager) close() {
 	defer tm.mu.Unlock()
 
 	// 清空
+	for _, t := range tm.timers {
+		t.clean()
+	}
+	for _, t := range tm.pendingTimers {
+		t.clean()
+	}
 	tm.timers = make(map[int64]*timer)
 	tm.pendingTimers = nil
 }

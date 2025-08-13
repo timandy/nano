@@ -1,7 +1,6 @@
 package twscheduler
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,11 +13,10 @@ type timerManager struct {
 	tick             int64        // 最小时间粒度(ns)
 	slotMask         int64        // 槽位数量掩码, 用于快速计算槽位索引, slotNum(2^n) - 1
 	slots            []*slot      // 槽位数组
-	current          int64        // 槽位指针
-	currentMu        sync.Mutex   // 槽位指针锁
+	current          atomic.Int64 // 槽位指针
 }
 
-// addTimer 根据当前时间, 移动定时器槽位; 调用方, 必须持有定时器所在槽位的锁或定时器不属于任何槽位
+// addTimer 可以在任意协程执行, 根据当前时间, 移动定时器槽位; 调用方必须持有定时器源槽位的锁或定时器不属于任何槽位
 func (tm *timerManager) addTimer(t *timer, delay int64) {
 	// 取消注册
 	origSlt := t.slot
@@ -31,7 +29,7 @@ func (tm *timerManager) addTimer(t *timer, delay int64) {
 	}
 
 	// 计算槽位下标
-	idx := (tm.current + remain) & tm.slotMask
+	idx := (tm.current.Load() + remain) & tm.slotMask
 	slt := tm.slots[idx]
 
 	// 锁住目标槽位; 目标槽位不是原槽位时才加锁, 防止死锁
@@ -44,17 +42,14 @@ func (tm *timerManager) addTimer(t *timer, delay int64) {
 	slt.link(t)
 }
 
-// next 返回当前槽位, 并推进指针到下一个槽位
+// next 只能被 scheduler 协程执行, 返回当前槽位, 并推进指针到下一个槽位
 func (tm *timerManager) next() *slot {
-	tm.currentMu.Lock()
-	defer tm.currentMu.Unlock()
-
-	slotIdx := tm.current
-	tm.current = (tm.current + 1) & tm.slotMask
+	slotIdx := tm.current.Load()
+	tm.current.Store((slotIdx + 1) & tm.slotMask)
 	return tm.slots[slotIdx]
 }
 
-// 推进指针并执行到期任务
+// 只能被 scheduler 协程执行, 推进指针并执行到期任务
 func (tm *timerManager) advance(s *scheduler) {
 	// 获取当前槽位, 并推进指针到下一个槽位
 	slt := tm.next()
@@ -94,14 +89,8 @@ func (tm *timerManager) advance(s *scheduler) {
 
 // 只能被 scheduler 协程执行, 清空 timers 和 pendingTimers
 func (tm *timerManager) close() {
-	tm.currentMu.Lock()
-	defer tm.currentMu.Unlock()
-
-	// 清空
-	slotNum := len(tm.slots)
-	tm.slots = make([]*slot, slotNum)
-	for i := 0; i < slotNum; i++ {
-		tm.slots[i] = &slot{}
+	for _, slt := range tm.slots {
+		slt.clear()
 	}
 }
 

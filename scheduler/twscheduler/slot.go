@@ -18,3 +18,17 @@ func (s *slot) link(t *timer) {
 	t.prev = nil
 	s.head = t
 }
+
+// clear 清空槽位, 执行定时器的清理工作
+func (s *slot) clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var next *timer
+	for t := s.head; t != nil; t = next {
+		// 提前保存 next，防止 t 被 unlink 后 next 丢失
+		next = t.next
+		t.unlink()
+		t.clean()
+	}
+}
