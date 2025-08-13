@@ -14,8 +14,11 @@ const (
 	groupStatusClosed  = 1
 )
 
-// SessionFilter 表示用于在组播时会话的过滤器, 过滤器返回 true 的会话将收到消息
-type SessionFilter func(*session.Session) bool
+// SessionFilterFunc 表示用于在组播时会话的过滤器, 过滤器返回 true 的会话将收到消息
+type SessionFilterFunc func(*session.Session) bool
+
+// SessionWalkFunc 表示用于在遍历会话的函数, 返回 true 时继续遍历, 返回 false 时停止遍历
+type SessionWalkFunc func(*session.Session) bool
 
 // Group 表示一组会话，用于管理多个会话
 type Group struct {
@@ -130,7 +133,7 @@ func (g *Group) Member(uid int64) (*session.Session, error) {
 }
 
 // FindMember 查找满足指定条件的会话
-func (g *Group) FindMember(filter func(ses *session.Session) bool) (*session.Session, error) {
+func (g *Group) FindMember(filter SessionFilterFunc) (*session.Session, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -144,7 +147,7 @@ func (g *Group) FindMember(filter func(ses *session.Session) bool) (*session.Ses
 }
 
 // Multicast 将消息发送给满足过滤条件的会话
-func (g *Group) Multicast(route string, v any, filter SessionFilter) error {
+func (g *Group) Multicast(route string, v any, filter SessionFilterFunc) error {
 	if g.isClosed() {
 		return ErrClosedGroup
 	}
@@ -200,13 +203,33 @@ func (g *Group) Broadcast(route string, v any) error {
 	return err
 }
 
-// Close 关闭组，释放所有资源
+// Walk 遍历会话, fn 返回 true 继续遍历, 返回 false 时停止遍历
+func (g *Group) Walk(fn SessionWalkFunc) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	for _, s := range g.sessions {
+		if !fn(s) {
+			return
+		}
+	}
+}
+
+// Close 关闭并清空组内所有会话
 func (g *Group) Close() error {
 	if !g.status.CompareAndSwap(groupStatusWorking, groupStatusClosed) {
 		return ErrCloseClosedGroup
 	}
 
-	// release all reference
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	// 关闭所有会话
+	for _, s := range g.sessions {
+		s.Close()
+	}
+
+	// 清空
 	g.sessions = make(map[int64]*session.Session)
 	return nil
 }
