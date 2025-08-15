@@ -224,6 +224,9 @@ func (h *LocalHandler) handle(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
+			if agt.status() == statusClosed {
+				return
+			}
 			log.Error("Read message error, session will be closed immediately.", err)
 			return
 		}
