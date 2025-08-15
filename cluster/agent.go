@@ -165,7 +165,7 @@ func (a *agent) Close() error {
 	a.setStatus(statusClosed)
 
 	if env.Debug {
-		log.Info("Session closed, ID=%d, UID=%d, IP=%s", a.session.ID(), a.session.UID(), a.conn.RemoteAddr())
+		log.Info("Session closing, ID=%d, UID=%d, IP=%s", a.session.ID(), a.session.UID(), a.conn.RemoteAddr())
 	}
 
 	// 防止关闭已经是关闭状态的 chan
@@ -175,8 +175,7 @@ func (a *agent) Close() error {
 	default:
 		close(a.chDie)
 	}
-
-	return a.conn.Close()
+	return nil
 }
 
 // String 返回描述信息
@@ -209,7 +208,10 @@ func (a *agent) write() {
 		if !forceQuit {
 			a.flush(chWrite)
 		}
+		//更改 agent 状态, 必须先更改状态再关闭底层连接
 		_ = a.Close()
+		//关闭底层连接, 此时 conn.Read() 将返回错误, 因上一步已经把状态关闭, 所以读协程会跳过日志退出
+		_ = a.conn.Close()
 		if env.Debug {
 			log.Info("Session write goroutine exit, SessionID=%d, UID=%d", a.session.ID(), a.session.UID())
 		}
