@@ -38,32 +38,37 @@ func NewGroup(name string) *Group {
 	return g
 }
 
+// Name 返回组名
+func (g *Group) Name() string {
+	return g.name
+}
+
 // Add 往组中添加会话
-func (g *Group) Add(session *session.Session) error {
-	if g.isClosed() {
+func (g *Group) Add(s *session.Session) error {
+	if g.IsClosed() {
 		return ErrClosedGroup
 	}
 
 	if env.Debug {
-		log.Info("Add session to group %s, ID=%d, UID=%d", g.name, session.ID(), session.UID())
+		log.Info("Add session to group %s, ID=%d, UID=%d", g.name, s.ID(), s.UID())
 	}
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	id := session.ID()
-	_, ok := g.sessions[session.ID()]
+	id := s.ID()
+	_, ok := g.sessions[id]
 	if ok {
 		return ErrSessionDuplication
 	}
 
-	g.sessions[id] = session
+	g.sessions[id] = s
 	return nil
 }
 
 // Remove 从组中移除会话
 func (g *Group) Remove(s *session.Session) error {
-	if g.isClosed() {
+	if g.IsClosed() {
 		return ErrClosedGroup
 	}
 
@@ -78,10 +83,19 @@ func (g *Group) Remove(s *session.Session) error {
 	return nil
 }
 
+// Contains 检查组中是否包含指定会话
+func (g *Group) Contains(s *session.Session) bool {
+	return g.ContainsSID(s.ID())
+}
+
 // Clear 删除组中的所有会话
 func (g *Group) Clear() error {
-	if g.isClosed() {
+	if g.IsClosed() {
 		return ErrClosedGroup
+	}
+
+	if env.Debug {
+		log.Info("Clear all session from group %s", g.name)
 	}
 
 	g.mu.Lock()
@@ -99,56 +113,105 @@ func (g *Group) Count() int {
 	return len(g.sessions)
 }
 
-// Contains 检查组中是否包含指定 UID 的会话
-func (g *Group) Contains(uid int64) bool {
-	_, err := g.Member(uid)
-	return err == nil
-}
-
-// Members 获取组中所有会话的 UID 列表
-func (g *Group) Members() []int64 {
+// SIDs 获取组中所有会话的 SID 列表
+func (g *Group) SIDs() []int64 {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	var members []int64
+	var sids []int64
 	for _, s := range g.sessions {
-		members = append(members, s.UID())
+		sids = append(sids, s.ID())
 	}
-
-	return members
+	return sids
 }
 
-// Member 获取指定 UID 的会话
-func (g *Group) Member(uid int64) (*session.Session, error) {
+// ContainsSID 检查组中是否包含指定 SID 的会话
+func (g *Group) ContainsSID(sid int64) bool {
+	s := g.FindBySID(sid)
+	return s != nil
+}
+
+// FindBySID 获取指定 SID 的会话
+func (g *Group) FindBySID(sid int64) *session.Session {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	return g.sessions[sid]
+}
+
+// UIDs 获取组中所有会话的 UID 列表
+func (g *Group) UIDs() []int64 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var uids []int64
+	for _, s := range g.sessions {
+		uids = append(uids, s.UID())
+	}
+	return uids
+}
+
+// ContainsUID 检查组中是否包含指定 UID 的会话
+func (g *Group) ContainsUID(uid int64) bool {
+	s := g.FindByUID(uid)
+	return s != nil
+}
+
+// FindByUID 获取指定 UID 的会话
+func (g *Group) FindByUID(uid int64) *session.Session {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
 	for _, s := range g.sessions {
 		if s.UID() == uid {
-			return s, nil
+			return s
 		}
 	}
-
-	return nil, ErrMemberNotFound
+	return nil
 }
 
-// FindMember 查找满足指定条件的会话
-func (g *Group) FindMember(filter SessionFilterFunc) (*session.Session, error) {
+// Find 查找第一个满足指定条件的会话
+func (g *Group) Find(fn SessionFilterFunc) *session.Session {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
 	for _, s := range g.sessions {
-		if filter(s) {
-			return s, nil
+		if fn(s) {
+			return s
 		}
 	}
+	return nil
+}
 
-	return nil, ErrMemberNotFound
+// Filter 返回满足过滤条件的会话列表
+func (g *Group) Filter(fn SessionFilterFunc) []*session.Session {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var sessions []*session.Session
+	for _, s := range g.sessions {
+		if fn(s) {
+			sessions = append(sessions, s)
+		}
+	}
+	return sessions
+}
+
+// Walk 遍历会话, fn 返回 true 时继续遍历, 返回 false 时停止遍历
+func (g *Group) Walk(fn SessionWalkFunc) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	for _, s := range g.sessions {
+		if !fn(s) {
+			return
+		}
+	}
 }
 
 // Multicast 将消息发送给满足过滤条件的会话
-func (g *Group) Multicast(route string, v any, filter SessionFilterFunc) error {
-	if g.isClosed() {
+func (g *Group) Multicast(route string, v any, fn SessionFilterFunc) error {
+	if g.IsClosed() {
 		return ErrClosedGroup
 	}
 
@@ -165,20 +228,20 @@ func (g *Group) Multicast(route string, v any, filter SessionFilterFunc) error {
 	defer g.mu.RUnlock()
 
 	for _, s := range g.sessions {
-		if !filter(s) {
+		if !fn(s) {
 			continue
 		}
 		if err = s.Push(route, data); err != nil {
-			log.Error("Push message error.", err)
+			log.Error("Session push message error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
 		}
 	}
 
-	return nil
+	return err
 }
 
 // Broadcast 将消息发送给组中的所有会话
 func (g *Group) Broadcast(route string, v any) error {
-	if g.isClosed() {
+	if g.IsClosed() {
 		return ErrClosedGroup
 	}
 
@@ -203,16 +266,9 @@ func (g *Group) Broadcast(route string, v any) error {
 	return err
 }
 
-// Walk 遍历会话, fn 返回 true 继续遍历, 返回 false 时停止遍历
-func (g *Group) Walk(fn SessionWalkFunc) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	for _, s := range g.sessions {
-		if !fn(s) {
-			return
-		}
-	}
+// IsClosed 组是否关闭
+func (g *Group) IsClosed() bool {
+	return g.status.Load() == groupStatusClosed
 }
 
 // Close 关闭并清空组内所有会话
@@ -232,9 +288,4 @@ func (g *Group) Close() error {
 	// 清空
 	g.sessions = make(map[int64]*session.Session)
 	return nil
-}
-
-// isClosed 组是否关闭
-func (g *Group) isClosed() bool {
-	return g.status.Load() == groupStatusClosed
 }
