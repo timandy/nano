@@ -58,6 +58,9 @@ func (lt *event) FireSessionClosed(s *Session) {
 	for _, fn := range lt.onSessionClosed {
 		fn(s)
 	}
+
+	// 执行完回调, 清除会话关联的数据
+	s.Clear()
 }
 
 // MessagePushing 设置消息推送前的回调, 可以修改消息内容和路由
