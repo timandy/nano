@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,17 +33,19 @@ var _ session.NetworkEntity = (*agent)(nil)
 // agent 与客户端直接通信的网络对象(单点模式中的节点, 或集群模式的网关)
 type agent struct {
 	// regular agent member
-	session    *session.Session    // session
-	conn       net.Conn            // low-level conn fd
-	lastMid    uint64              // last message id
-	state      atomic.Int32        // current agent state
-	chDie      chan struct{}       // wait for close
-	chSend     chan pendingMessage // push message queue
-	lastAt     int64               // last heartbeat unix time stamp
-	decoder    *packet.Decoder     // binary decoder
-	pipeline   pipeline.Pipeline   //
-	rpcHandler rpcHandler          //
-	srv        reflect.Value       // cached session reflect.Value
+	session       *session.Session    // session
+	conn          net.Conn            // low-level conn fd
+	lastMid       uint64              // last message id
+	chDie         chan struct{}       // wait for close
+	chSend        chan pendingMessage // push message queue
+	lastAt        atomic.Int64        // last heartbeat unix time stamp
+	decoder       *packet.Decoder     // binary decoder
+	pipeline      pipeline.Pipeline   //
+	rpcHandler    rpcHandler          //
+	writeReady    atomic.Bool         // write 协程是否已经启动
+	connCloseOnce sync.Once           // 确保 conn 只关闭一次
+	chanCloseOnce sync.Once           // 确保 chDie 和 chSend 只关闭一次
+	state         atomic.Int32        // current agent state
 }
 
 // pendingMessage 待发送的消息
@@ -59,18 +61,17 @@ func newAgent(conn net.Conn, pipeline pipeline.Pipeline, rpcHandler rpcHandler) 
 	a := &agent{
 		conn:       conn,
 		chDie:      make(chan struct{}),
-		lastAt:     time.Now().Unix(),
 		chSend:     make(chan pendingMessage, agentWriteBacklog),
 		decoder:    packet.NewDecoder(),
 		pipeline:   pipeline,
 		rpcHandler: rpcHandler,
 	}
+	a.lastAt.Store(time.Now().Unix())
 	a.state.Store(statusStart)
 
 	// binding session
 	s := session.New(a)
 	a.session = s
-	a.srv = reflect.ValueOf(s)
 	return a
 }
 
@@ -157,7 +158,7 @@ func (a *agent) ResponseMid(mid uint64, v any) error {
 	return a.send(pendingMessage{typ: message.Response, mid: mid, payload: v})
 }
 
-// Close 关闭低级连接, 任何被阻塞读取或写入作都将被取消阻塞并返回错误
+// Close 设置关闭状态, 发送关闭信号; 如果 write 协程未就绪, 直接关闭底层连接; 否则由 write 协程 flush 完数据后关闭
 func (a *agent) Close() error {
 	if a.status() == statusClosed {
 		return ErrCloseClosedSession
@@ -168,19 +169,38 @@ func (a *agent) Close() error {
 		log.Info("Session closing, ID=%d, UID=%d, IP=%s", a.session.ID(), a.session.UID(), a.conn.RemoteAddr())
 	}
 
-	// 防止关闭已经是关闭状态的 chan
-	select {
-	case <-a.chDie:
-		// expect
-	default:
-		close(a.chDie)
+	// 关闭 chan, 发出停止信号
+	a.closeChanOnce()
+
+	// 如果 write 协程已经启动, 则不需要关闭底层连接, 因为 write 协程 flush 完会自动处理
+	if a.writeReady.Load() {
+		return nil
 	}
-	return nil
+
+	// 如果 write 协程还未启动, 则直接关闭底层连接
+	return a.closeConnOnce()
 }
 
 // String 返回描述信息
 func (a *agent) String() string {
-	return fmt.Sprintf("Remote=%s, LastTime=%d", a.conn.RemoteAddr().String(), atomic.LoadInt64(&a.lastAt))
+	return fmt.Sprintf("Remote=%s, LastTime=%d", a.conn.RemoteAddr().String(), a.lastAt.Load())
+}
+
+// closeChanOnce 确保 chan 只关闭一次
+func (a *agent) closeChanOnce() {
+	a.chanCloseOnce.Do(func() {
+		close(a.chDie)
+		close(a.chSend)
+	})
+}
+
+// closeConnOnce 确保 conn 只关闭一次
+func (a *agent) closeConnOnce() error {
+	var err error
+	a.connCloseOnce.Do(func() {
+		err = a.conn.Close()
+	})
+	return err
 }
 
 // status 获取当前状态
@@ -202,28 +222,33 @@ func (a *agent) write() {
 	// clean func
 	defer func() {
 		ticker.Stop()
-		close(a.chSend)
 		close(chWrite)
-		//非强制退出, 则将所有待发送的消息写入底层连接
+		// 关闭 chan, 必须关闭 chan 后才能执行 flush, 否则阻塞
+		a.closeChanOnce()
+		// 非强制退出, 则将所有待发送的消息写入底层连接
 		if !forceQuit {
 			a.flush(chWrite)
 		}
-		//更改 agent 状态, 必须先更改状态再关闭底层连接
+		// 更改 agent 状态, 必须先更改状态再关闭底层连接
 		_ = a.Close()
-		//关闭底层连接, 此时 conn.Read() 将返回错误, 因上一步已经把状态关闭, 所以读协程会跳过日志退出
-		_ = a.conn.Close()
+		// 关闭底层连接, 此时 conn.Read() 将返回错误, 因上一步已经把状态关闭, 所以读协程会跳过日志退出
+		_ = a.closeConnOnce()
 		if env.Debug {
 			log.Info("Session write goroutine exit, SessionID=%d, UID=%d", a.session.ID(), a.session.UID())
 		}
 	}()
+
+	// 标记 write 协程已经就绪
+	a.writeReady.Store(true)
 
 	for {
 		select {
 		// 心跳检测
 		case <-ticker.C:
 			deadline := time.Now().Add(-2 * heartbeat).Unix()
-			if atomic.LoadInt64(&a.lastAt) < deadline {
-				log.Info("Session heartbeat timeout, LastTime=%d, Deadline=%d", atomic.LoadInt64(&a.lastAt), deadline)
+			lastAt := a.lastAt.Load()
+			if lastAt < deadline {
+				log.Info("Session heartbeat timeout, LastTime=%d, Deadline=%d", lastAt, deadline)
 				return
 			}
 			chWrite <- getHbd()

@@ -299,7 +299,7 @@ func (h *LocalHandler) processPacket(agent *agent, p *packet.Packet) error {
 		return errors.New("invalid packet type")
 	}
 
-	agent.lastAt = time.Now().Unix()
+	agent.lastAt.Store(time.Now().Unix())
 	return nil
 }
 

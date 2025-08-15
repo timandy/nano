@@ -39,6 +39,14 @@ func (lt *event) FireSessionCreated(s *Session) {
 		return
 	}
 
+	// 回调过程中如果发生 panic, 需要关闭底层连接以防止连接泄露
+	defer func() {
+		if r := recover(); r != nil {
+			s.Close()
+			panic(r) // 重新抛出 panic
+		}
+	}()
+
 	for _, fn := range lt.onSessionCreated {
 		fn(s)
 	}
@@ -55,12 +63,12 @@ func (lt *event) FireSessionClosed(s *Session) {
 		return
 	}
 
+	// 执行完回调, 清除会话关联的数据
+	defer s.Clear()
+
 	for _, fn := range lt.onSessionClosed {
 		fn(s)
 	}
-
-	// 执行完回调, 清除会话关联的数据
-	s.Clear()
 }
 
 // MessagePushing 设置消息推送前的回调, 可以修改消息内容和路由

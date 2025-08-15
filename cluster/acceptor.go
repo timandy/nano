@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"net"
+	"sync/atomic"
 
 	"github.com/lonng/nano/cluster/clusterpb"
 	"github.com/lonng/nano/internal/env"
@@ -22,17 +23,20 @@ type acceptor struct {
 	lastMid    uint64
 	rpcHandler rpcHandler
 	gateAddr   string
+	state      atomic.Int32 // current acceptor state
 }
 
 // newAcceptor 构造函数
 func newAcceptor(sid int64, node *Node, gateClient clusterpb.GateClient, rpcHandler rpcHandler, gateAddr string) *acceptor {
-	return &acceptor{
+	a := &acceptor{
 		sid:        sid,
 		node:       node,
 		gateClient: gateClient,
 		rpcHandler: rpcHandler,
 		gateAddr:   gateAddr,
 	}
+	a.state.Store(statusWorking)
+	return a
 }
 
 // RemoteAddr 返回一个假的地址
@@ -47,6 +51,9 @@ func (a *acceptor) LastMid() uint64 {
 
 // RPC 调用集群内的服务
 func (a *acceptor) RPC(route string, v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
 	// TODO: buffer
 	data, err := env.Marshal(v)
 	if err != nil {
@@ -63,6 +70,9 @@ func (a *acceptor) RPC(route string, v any) error {
 
 // Push 调用 Gate, 推送数据给客户端
 func (a *acceptor) Push(route string, v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
 	// TODO: buffer
 	data, err := env.Marshal(v)
 	if err != nil {
@@ -84,6 +94,9 @@ func (a *acceptor) Response(v any) error {
 
 // ResponseMid 调用 Gate, 返回响应数据给客户端
 func (a *acceptor) ResponseMid(mid uint64, v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
 	// TODO: buffer
 	data, err := env.Marshal(v)
 	if err != nil {
@@ -100,10 +113,13 @@ func (a *acceptor) ResponseMid(mid uint64, v any) error {
 
 // Close 集群模式下, Worker 节点关闭会话, 通知 Gate 也关闭(主动关闭)
 func (a *acceptor) Close() error {
+	if !a.state.CompareAndSwap(statusWorking, statusClosed) {
+		return ErrCloseClosedSession
+	}
 	// TODO: buffer
 	// 先删除
 	s, found := a.node.delSession(a.sid)
-	// 通知 gate
+	// 通知 Gate 关闭连接
 	request := &clusterpb.CloseSessionRequest{
 		SessionId: a.sid,
 	}
@@ -113,4 +129,9 @@ func (a *acceptor) Close() error {
 		s.Execute(func() { session.Event.FireSessionClosed(s) }) //异步执行关闭事件
 	}
 	return err
+}
+
+// status 获取当前状态
+func (a *acceptor) status() int32 {
+	return a.state.Load()
 }
