@@ -21,6 +21,7 @@ import (
 	"github.com/lonng/nano/protocal/packet"
 	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session"
+	"github.com/timandy/routine"
 )
 
 type rpcHandler func(session *session.Session, msg *message.Message, noCopy bool)
@@ -184,7 +185,7 @@ func (h *LocalHandler) handle(conn net.Conn) {
 	}()
 
 	// startup write goroutine
-	go agt.write()
+	routine.Go(agt.write)
 
 	if env.Debug {
 		log.Info("New session established: %s", agt.String())
