@@ -12,6 +12,7 @@ import (
 	"github.com/lonng/nano/component"
 	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/pipeline"
+	"github.com/lonng/nano/protocal/message"
 	"github.com/lonng/nano/protocal/serialize/json"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/scheduler/schedulerapi"
@@ -60,12 +61,12 @@ type (
 	}
 )
 
-func (stats *stats) outbound(s *session.Session, msg *pipeline.Message) error {
+func (stats *stats) outbound(s *session.Session, msg *message.Message) error {
 	stats.outboundBytes += len(msg.Data)
 	return nil
 }
 
-func (stats *stats) inbound(s *session.Session, msg *pipeline.Message) error {
+func (stats *stats) inbound(s *session.Session, msg *message.Message) error {
 	stats.inboundBytes += len(msg.Data)
 	return nil
 }
