@@ -6,7 +6,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0 // The latest version support go1.20
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/timandy/routine v1.1.6
 	github.com/urfave/cli/v2 v2.27.7
 	google.golang.org/grpc v1.64.1 // The latest version support go1.20
