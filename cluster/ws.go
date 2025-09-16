@@ -8,27 +8,22 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var _ net.Conn = (*wsConn)(nil)
+
 // wsConn is an adapter to t.Conn, which implements all t.Conn
 // interface base on *websocket.Conn
 type wsConn struct {
 	conn   *websocket.Conn
-	typ    int // message type
 	reader io.Reader
 }
 
-// newWSConn return an initialized *wsConn
-func newWSConn(conn *websocket.Conn) (*wsConn, error) {
-	c := &wsConn{conn: conn}
-
-	t, r, err := conn.NextReader()
+// NewWSConn return an initialized *wsConn
+func newWSConn(conn *websocket.Conn) (net.Conn, error) {
+	_, r, err := conn.NextReader()
 	if err != nil {
 		return nil, err
 	}
-
-	c.typ = t
-	c.reader = r
-
-	return c, nil
+	return &wsConn{conn: conn, reader: r}, nil
 }
 
 // Read reads data from the connection.
@@ -96,7 +91,6 @@ func (c *wsConn) SetDeadline(t time.Time) error {
 	if err := c.conn.SetReadDeadline(t); err != nil {
 		return err
 	}
-
 	return c.conn.SetWriteDeadline(t)
 }
 
