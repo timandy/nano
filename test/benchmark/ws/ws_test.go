@@ -4,6 +4,7 @@
 package ws
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -16,6 +17,7 @@ import (
 	"github.com/lonng/nano/protocal/serialize/protobuf"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/benchmark/testdata"
+	cli "github.com/lonng/nano/test/client"
 )
 
 const (
@@ -64,18 +66,18 @@ func server() {
 }
 
 func client() {
-	c := NewWsConnector()
+	c := cli.NewWsClient()
 
 	chReady := make(chan struct{})
 	c.OnConnected(func() {
 		chReady <- struct{}{}
 	})
 
-	if err := c.Start(addr); err != nil {
+	if err := c.Start(fmt.Sprintf("ws://%v/ws", addr)); err != nil {
 		panic(err)
 	}
 
-	c.On("pong", func(data any) {})
+	c.On("pong", func(data []byte) {})
 
 	<-chReady
 	for /*i := 0; i < 1; i++*/ {

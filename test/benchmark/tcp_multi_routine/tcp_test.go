@@ -18,8 +18,8 @@ import (
 	"github.com/lonng/nano/scheduler/defscheduler"
 	"github.com/lonng/nano/scheduler/schedulerapi"
 	"github.com/lonng/nano/session"
-	"github.com/lonng/nano/test/benchmark/tcp"
 	"github.com/lonng/nano/test/benchmark/testdata"
+	cli "github.com/lonng/nano/test/client"
 )
 
 const (
@@ -86,7 +86,7 @@ func server() {
 }
 
 func client() {
-	c := tcp.NewTcpConnector()
+	c := cli.NewTcpClient()
 
 	chReady := make(chan struct{})
 	c.OnConnected(func() {
@@ -97,7 +97,7 @@ func client() {
 		panic(err)
 	}
 
-	c.On("pong", func(data any) {})
+	c.On("pong", func(data []byte) {})
 
 	<-chReady
 	for /*i := 0; i < 1; i++*/ {

@@ -9,7 +9,7 @@ import (
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/benchmark/testdata"
-	"github.com/lonng/nano/test/benchmark/ws"
+	cli "github.com/lonng/nano/test/client"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,23 +88,14 @@ func TestNodeStartup(t *testing.T) {
 	assert.Equal(t, member2Handler.LocalService(), []string{"GameComponent"})
 	assert.Equal(t, member2Handler.RemoteService(), []string{"GateComponent", "MasterComponent"})
 
-	//客户端
-	connector := ws.NewWsConnector()
-
-	chWait := make(chan struct{})
-	connector.OnConnected(func() {
-		chWait <- struct{}{}
-	})
-
-	// Connect to gate server
-	err := connector.Start("127.0.0.1:14452")
-	assert.NoError(t, err)
-	<-chWait
+	connector := connect(t)
+	// 注册推送回调
 	onResult := make(chan string)
-	connector.On("test", func(data any) {
-		onResult <- string(data.([]byte))
+	connector.On("test", func(data []byte) {
+		onResult <- string(data)
 	})
-	err = connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
+
+	err := connector.Notify("GateComponent.Test", &testdata.Ping{Content: "ping"})
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "gate server pong")
 
@@ -112,14 +103,14 @@ func TestNodeStartup(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "game server pong")
 
-	err = connector.Request("GateComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
-		onResult <- string(data.([]byte))
+	err = connector.Request("GateComponent.Test2", &testdata.Ping{Content: "ping"}, func(data []byte) {
+		onResult <- string(data)
 	})
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "gate server pong2")
 
-	err = connector.Request("GameComponent.Test2", &testdata.Ping{Content: "ping"}, func(data any) {
-		onResult <- string(data.([]byte))
+	err = connector.Request("GameComponent.Test2", &testdata.Ping{Content: "ping"}, func(data []byte) {
+		onResult <- string(data)
 	})
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "game server pong2")
@@ -127,4 +118,19 @@ func TestNodeStartup(t *testing.T) {
 	err = connector.Notify("MasterComponent.Test", &testdata.Ping{Content: "ping"})
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "master server pong")
+}
+
+func connect(t *testing.T) *cli.Client {
+	// 初始化客户端
+	connector := cli.NewWsClient()
+	chWait := make(chan struct{})
+	connector.OnConnected(func() {
+		chWait <- struct{}{}
+	})
+
+	// 连接到服务器
+	err := connector.Start("ws://127.0.0.1:14452/ws")
+	assert.NoError(t, err)
+	<-chWait
+	return connector
 }
