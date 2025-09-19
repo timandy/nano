@@ -173,6 +173,11 @@ func (s *Session) ResponseMID(mid uint64, v any) error {
 	return s.entity.ResponseMid(mid, v)
 }
 
+// Kick 推送消息给客户端并关闭连接
+func (s *Session) Kick(v any) error {
+	return s.entity.Kick(v)
+}
+
 //==================== 数据 ====================
 
 // Remove 删除与 key 关联的值

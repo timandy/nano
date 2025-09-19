@@ -111,6 +111,29 @@ func (a *acceptor) ResponseMid(mid uint64, v any) error {
 	return err
 }
 
+// Kick 推送消息给客户端并关闭连接
+func (a *acceptor) Kick(v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
+
+	// 通知 Gate 关闭连接, 不管 kick 消息发送成功与否
+	//goland:noinspection GoUnhandledErrorResult
+	defer a.Close()
+
+	// TODO: buffer
+	data, err := env.Marshal(v)
+	if err != nil {
+		return err
+	}
+	request := &clusterpb.KickMessage{
+		SessionId: a.sid,
+		Data:      data,
+	}
+	_, err = a.gateClient.HandleKick(context.Background(), request)
+	return err
+}
+
 // Close 集群模式下, Worker 节点关闭会话, 通知 Gate 也关闭(主动关闭)
 func (a *acceptor) Close() error {
 	if !a.state.CompareAndSwap(statusWorking, statusClosed) {

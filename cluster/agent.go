@@ -50,6 +50,7 @@ type agent struct {
 
 // pendingMessage 待发送的消息
 type pendingMessage struct {
+	pkt     packet.Type  // packet type
 	typ     message.Type // message type
 	route   string       // message route(push)
 	mid     uint64       // response message id(response)
@@ -124,7 +125,7 @@ func (a *agent) Push(route string, v any) error {
 		}
 	}
 
-	return a.send(pendingMessage{typ: message.Push, route: route, payload: v})
+	return a.send(pendingMessage{pkt: packet.Data, typ: message.Push, route: route, payload: v})
 }
 
 // Response 返回响应数据给客户端
@@ -155,7 +156,33 @@ func (a *agent) ResponseMid(mid uint64, v any) error {
 		}
 	}
 
-	return a.send(pendingMessage{typ: message.Response, mid: mid, payload: v})
+	return a.send(pendingMessage{pkt: packet.Data, typ: message.Response, mid: mid, payload: v})
+}
+
+// Kick 推送消息给客户端并关闭连接
+func (a *agent) Kick(v any) error {
+	if a.status() == statusClosed {
+		return ErrBrokenPipe
+	}
+
+	// 关闭连接, 不管 kick 消息发送成功与否
+	//goland:noinspection GoUnhandledErrorResult
+	defer a.Close()
+
+	if len(a.chSend) >= agentWriteBacklog {
+		return ErrBufferExceed
+	}
+
+	if env.Debug {
+		switch d := v.(type) {
+		case []byte:
+			log.Info("Type=Kick, ID=%d, UID=%d, Data=%dbytes", a.session.ID(), a.session.UID(), len(d))
+		default:
+			log.Info("Type=Kick, ID=%d, UID=%d, Data=%v", a.session.ID(), a.session.UID(), v)
+		}
+	}
+
+	return a.send(pendingMessage{pkt: packet.Kick, typ: message.Push, payload: v})
 }
 
 // Close 设置关闭状态, 发送关闭信号; 如果 write 协程未就绪, 直接关闭底层连接; 否则由 write 协程 flush 完数据后关闭
@@ -297,11 +324,19 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 	// 序列化
 	payload, err := env.Marshal(data.payload)
 	if err != nil {
-		switch data.typ {
-		case message.Push:
-			log.Error("Push: %s error.", data.route, err)
-		case message.Response:
-			log.Error("Response message(id: %d) error.", data.mid, err)
+		switch data.pkt {
+		case packet.Data:
+			switch data.typ {
+			case message.Push:
+				log.Error("Push: %s marshal error.", data.route, err)
+			case message.Response:
+				log.Error("Response message(id: %d) marshal error.", data.mid, err)
+			}
+		case packet.Kick:
+			switch data.typ {
+			case message.Push:
+				log.Error("%v: marshal error.", data.pkt, err)
+			}
 		default:
 			// expect
 		}
@@ -333,7 +368,7 @@ func (a *agent) packMsg(data pendingMessage) []byte {
 	}
 
 	// 封包
-	p, err := packet.Encode(packet.Data, em)
+	p, err := packet.Encode(data.pkt, em)
 	if err != nil {
 		log.Error("Encode packet error.", err)
 		return nil

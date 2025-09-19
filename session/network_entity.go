@@ -10,5 +10,6 @@ type NetworkEntity interface {
 	Push(route string, v any) error
 	Response(v any) error
 	ResponseMid(mid uint64, v any) error
+	Kick(v any) error
 	Close() error
 }

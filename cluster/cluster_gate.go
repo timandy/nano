@@ -34,6 +34,14 @@ func (g gateService) HandleResponse(_ context.Context, req *clusterpb.ResponseMe
 	return &clusterpb.GateHandleResponse{}, s.ResponseMID(req.Id, req.Data)
 }
 
+func (g gateService) HandleKick(_ context.Context, req *clusterpb.KickMessage) (*clusterpb.GateHandleResponse, error) {
+	s, found := g.node.findSession(req.SessionId)
+	if !found {
+		return &clusterpb.GateHandleResponse{}, fmt.Errorf("session not found: %v", req.SessionId)
+	}
+	return &clusterpb.GateHandleResponse{}, s.Kick(req.Data)
+}
+
 // CloseSession 作为 Gate 时, 处理业务节点关闭 Session 的请求
 func (g gateService) CloseSession(_ context.Context, req *clusterpb.CloseSessionRequest) (*clusterpb.CloseSessionResponse, error) {
 	s, found := g.node.findSession(req.SessionId)

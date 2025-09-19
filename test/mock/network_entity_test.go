@@ -1,6 +1,7 @@
 package mock_test
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -12,20 +13,26 @@ import (
 func TestNetworkEntity(t *testing.T) {
 	entity := NewNetworkEntity()
 
-	assert.Nil(t, entity.LastResponse())
+	assert.Equal(t, entity.RemoteAddr().String(), "mock-addr")
+
+	assert.Nil(t, entity.findPush("t.tt"))
+	assert.Nil(t, entity.Push("t.tt", "test"))
+	assert.Equal(t, entity.findPush("t.tt").(string), "test")
+
+	assert.Nil(t, entity.findResponse())
 	assert.Equal(t, entity.LastMid(), uint64(1))
 	assert.Nil(t, entity.Response("hello"))
-	assert.Equal(t, entity.LastResponse().(string), "hello")
+	assert.Equal(t, entity.findResponse().(string), "hello")
 
-	assert.Nil(t, entity.FindResponseByMID(1))
+	assert.Nil(t, entity.findResponseMID(1))
 	assert.Nil(t, entity.ResponseMid(1, "test"))
-	assert.Equal(t, entity.FindResponseByMID(1).(string), "test")
+	assert.Equal(t, entity.findResponseMID(1).(string), "test")
 
-	assert.Nil(t, entity.FindResponseByRoute("t.tt"))
-	assert.Nil(t, entity.Push("t.tt", "test"))
-	assert.Equal(t, entity.FindResponseByRoute("t.tt").(string), "test")
+	assert.Nil(t, entity.findKick())
+	assert.Nil(t, entity.Kick("you are kicked"))
+	assert.Equal(t, "you are kicked", entity.findKick().(string))
+	assert.NotNil(t, entity.Kick("you are kicked again"))
 
-	assert.Equal(t, entity.RemoteAddr().String(), "mock-addr")
 	assert.Nil(t, entity.Close())
 }
 
@@ -37,29 +44,23 @@ type message struct {
 // NetworkEntity represents an network entity which can be used to construct the
 // session object.
 type NetworkEntity struct {
-	messages  []message
-	responses []any
-	msgmap    map[uint64]any
-	rpcCall   []message
+	rpc         []message
+	push        []message
+	response    []any
+	responseMid map[uint64]any
+	kick        any
 }
 
 // NewNetworkEntity returns an mock network entity
 func NewNetworkEntity() *NetworkEntity {
 	return &NetworkEntity{
-		msgmap: map[uint64]any{},
+		responseMid: map[uint64]any{},
 	}
 }
 
-// RPC implements the session.NetworkEntity interface
-func (n *NetworkEntity) RPC(route string, v any) error {
-	n.rpcCall = append(n.rpcCall, message{route: route, data: v})
-	return nil
-}
-
-// Push implements the session.NetworkEntity interface
-func (n *NetworkEntity) Push(route string, v any) error {
-	n.messages = append(n.messages, message{route: route, data: v})
-	return nil
+// RemoteAddr implements the session.NetworkEntity interface
+func (n *NetworkEntity) RemoteAddr() net.Addr {
+	return mock.NetAddr{}
 }
 
 // LastMid implements the session.NetworkEntity interface
@@ -67,19 +68,40 @@ func (n *NetworkEntity) LastMid() uint64 {
 	return 1
 }
 
+// RPC implements the session.NetworkEntity interface
+func (n *NetworkEntity) RPC(route string, v any) error {
+	n.rpc = append(n.rpc, message{route: route, data: v})
+	return nil
+}
+
+// Push implements the session.NetworkEntity interface
+func (n *NetworkEntity) Push(route string, v any) error {
+	n.push = append(n.push, message{route: route, data: v})
+	return nil
+}
+
 // Response implements the session.NetworkEntity interface
 func (n *NetworkEntity) Response(v any) error {
-	n.responses = append(n.responses, v)
+	n.response = append(n.response, v)
 	return nil
 }
 
 // ResponseMid implements the session.NetworkEntity interface
 func (n *NetworkEntity) ResponseMid(mid uint64, v any) error {
-	_, found := n.msgmap[mid]
+	_, found := n.responseMid[mid]
 	if found {
 		return fmt.Errorf("duplicated message id: %v", mid)
 	}
-	n.msgmap[mid] = v
+	n.responseMid[mid] = v
+	return nil
+}
+
+// Kick implements the session.NetworkEntity interface
+func (n *NetworkEntity) Kick(v any) error {
+	if n.kick != nil {
+		return errors.New("already kicked")
+	}
+	n.kick = v
 	return nil
 }
 
@@ -88,30 +110,30 @@ func (n *NetworkEntity) Close() error {
 	return nil
 }
 
-// RemoteAddr implements the session.NetworkEntity interface
-func (n *NetworkEntity) RemoteAddr() net.Addr {
-	return mock.NetAddr{}
-}
-
-// LastResponse returns the last respond message
-func (n *NetworkEntity) LastResponse() any {
-	if len(n.responses) < 1 {
-		return nil
-	}
-	return n.responses[len(n.responses)-1]
-}
-
-// FindResponseByMID returns the response respective the message id
-func (n *NetworkEntity) FindResponseByMID(mid uint64) any {
-	return n.msgmap[mid]
-}
-
-// FindResponseByRoute returns the response respective the route
-func (n *NetworkEntity) FindResponseByRoute(route string) any {
-	for i := range n.messages {
-		if n.messages[i].route == route {
-			return n.messages[i].data
+// findPush returns the response by route
+func (n *NetworkEntity) findPush(route string) any {
+	for i := range n.push {
+		if n.push[i].route == route {
+			return n.push[i].data
 		}
 	}
 	return nil
+}
+
+// findResponse returns the last response message
+func (n *NetworkEntity) findResponse() any {
+	if len(n.response) < 1 {
+		return nil
+	}
+	return n.response[len(n.response)-1]
+}
+
+// findResponseMID returns the response by message id
+func (n *NetworkEntity) findResponseMID(mid uint64) any {
+	return n.responseMid[mid]
+}
+
+// findKick returns the kick message
+func (n *NetworkEntity) findKick() any {
+	return n.kick
 }

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Gate_HandlePush_FullMethodName     = "/clusterpb.Gate/HandlePush"
 	Gate_HandleResponse_FullMethodName = "/clusterpb.Gate/HandleResponse"
+	Gate_HandleKick_FullMethodName     = "/clusterpb.Gate/HandleKick"
 	Gate_CloseSession_FullMethodName   = "/clusterpb.Gate/CloseSession"
 )
 
@@ -30,6 +31,7 @@ const (
 type GateClient interface {
 	HandlePush(ctx context.Context, in *PushMessage, opts ...grpc.CallOption) (*GateHandleResponse, error)
 	HandleResponse(ctx context.Context, in *ResponseMessage, opts ...grpc.CallOption) (*GateHandleResponse, error)
+	HandleKick(ctx context.Context, in *KickMessage, opts ...grpc.CallOption) (*GateHandleResponse, error)
 	CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error)
 }
 
@@ -61,6 +63,16 @@ func (c *gateClient) HandleResponse(ctx context.Context, in *ResponseMessage, op
 	return out, nil
 }
 
+func (c *gateClient) HandleKick(ctx context.Context, in *KickMessage, opts ...grpc.CallOption) (*GateHandleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GateHandleResponse)
+	err := c.cc.Invoke(ctx, Gate_HandleKick_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gateClient) CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CloseSessionResponse)
@@ -77,6 +89,7 @@ func (c *gateClient) CloseSession(ctx context.Context, in *CloseSessionRequest, 
 type GateServer interface {
 	HandlePush(context.Context, *PushMessage) (*GateHandleResponse, error)
 	HandleResponse(context.Context, *ResponseMessage) (*GateHandleResponse, error)
+	HandleKick(context.Context, *KickMessage) (*GateHandleResponse, error)
 	CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error)
 }
 
@@ -92,6 +105,9 @@ func (UnimplementedGateServer) HandlePush(context.Context, *PushMessage) (*GateH
 }
 func (UnimplementedGateServer) HandleResponse(context.Context, *ResponseMessage) (*GateHandleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleResponse not implemented")
+}
+func (UnimplementedGateServer) HandleKick(context.Context, *KickMessage) (*GateHandleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleKick not implemented")
 }
 func (UnimplementedGateServer) CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloseSession not implemented")
@@ -152,6 +168,24 @@ func _Gate_HandleResponse_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Gate_HandleKick_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KickMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GateServer).HandleKick(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Gate_HandleKick_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GateServer).HandleKick(ctx, req.(*KickMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Gate_CloseSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CloseSessionRequest)
 	if err := dec(in); err != nil {
@@ -184,6 +218,10 @@ var Gate_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleResponse",
 			Handler:    _Gate_HandleResponse_Handler,
+		},
+		{
+			MethodName: "HandleKick",
+			Handler:    _Gate_HandleKick_Handler,
 		},
 		{
 			MethodName: "CloseSession",

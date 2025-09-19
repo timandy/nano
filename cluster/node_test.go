@@ -3,14 +3,17 @@ package cluster_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/lonng/nano/cluster"
 	"github.com/lonng/nano/component"
+	"github.com/lonng/nano/internal/log"
 	"github.com/lonng/nano/scheduler"
 	"github.com/lonng/nano/session"
 	"github.com/lonng/nano/test/benchmark/testdata"
 	cli "github.com/lonng/nano/test/client"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type (
@@ -31,6 +34,10 @@ func (c *GateComponent) Test2(session *session.Session, ping *testdata.Ping) err
 	return session.Response(&testdata.Pong{Content: "gate server pong2"})
 }
 
+func (c *GateComponent) Kick(session *session.Session) error {
+	return session.Kick(&testdata.Pong{Content: "kick from gate"})
+}
+
 func (c *GameComponent) Test(session *session.Session, _ []byte) error {
 	return session.Push("test", &testdata.Pong{Content: "game server pong"})
 }
@@ -39,7 +46,14 @@ func (c *GameComponent) Test2(session *session.Session, ping *testdata.Ping) err
 	return session.Response(&testdata.Pong{Content: "game server pong2"})
 }
 
+func (c *GameComponent) Kick(session *session.Session) error {
+	return session.Kick(&testdata.Pong{Content: "kick from game"})
+}
+
 func TestNodeStartup(t *testing.T) {
+	session.Event.SessionClosed(func(s *session.Session) {
+		log.Info("session %v closed", s.ID())
+	})
 	scheduler.Start()
 	defer scheduler.Close()
 
@@ -118,6 +132,47 @@ func TestNodeStartup(t *testing.T) {
 	err = connector.Notify("MasterComponent.Test", &testdata.Ping{Content: "ping"})
 	assert.NoError(t, err)
 	assert.Contains(t, <-onResult, "master server pong")
+
+	log.Info("======Test kick from gate======")
+	onKick := make(chan string)
+	connector.OnKick(func(data []byte) {
+		onKick <- string(data)
+		log.Info("kicked")
+	})
+	connector.OnDisconnected(func() {
+		log.Info("disconnected")
+	})
+	err = connector.Request("GateComponent.Kick", &emptypb.Empty{}, func(data []byte) {
+		onResult <- string(data)
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, <-onKick, "kick from gate")
+	time.Sleep(10 * time.Millisecond)
+	err = connector.Notify("GateComponent.Kick", &emptypb.Empty{})
+	assert.Equal(t, cli.ErrClientClosed, err)
+	err = connector.Notify("GameComponent.Kick", &emptypb.Empty{})
+	assert.Equal(t, cli.ErrClientClosed, err)
+
+	log.Info("======Test kick from worker======")
+	connector = connect(t) //重新连接
+	onKick = make(chan string)
+	connector.OnKick(func(data []byte) {
+		onKick <- string(data)
+		log.Info("kicked")
+	})
+	connector.OnDisconnected(func() {
+		log.Info("disconnected")
+	})
+	err = connector.Request("GameComponent.Kick", &emptypb.Empty{}, func(data []byte) {
+		onResult <- string(data)
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, <-onKick, "kick from game")
+	time.Sleep(10 * time.Millisecond)
+	err = connector.Notify("GateComponent.Kick", &emptypb.Empty{})
+	assert.Equal(t, cli.ErrClientClosed, err)
+	err = connector.Notify("GameComponent.Kick", &emptypb.Empty{})
+	assert.Equal(t, cli.ErrClientClosed, err)
 }
 
 func connect(t *testing.T) *cli.Client {
