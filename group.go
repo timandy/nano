@@ -266,6 +266,68 @@ func (g *Group) Broadcast(route string, v any) error {
 	return err
 }
 
+// MultiKick 将消息发送给满足过滤条件的会话并关闭连接, 被踢出的会话将从组中移除
+func (g *Group) MultiKick(v any, fn SessionFilterFunc) error {
+	if g.IsClosed() {
+		return ErrClosedGroup
+	}
+
+	data, err := env.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	if env.Debug {
+		log.Info("MultiKick, Data=%v", v)
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	for _, s := range g.sessions {
+		if !fn(s) {
+			continue
+		}
+		if err = s.Kick(data); err != nil {
+			log.Error("Session kick error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
+		}
+		// 移除
+		delete(g.sessions, s.ID())
+	}
+
+	return err
+}
+
+// BroadKick 将消息发送给组中的所有会话并关闭连接, 清空组内所有会话
+func (g *Group) BroadKick(v any) error {
+	if g.IsClosed() {
+		return ErrClosedGroup
+	}
+
+	data, err := env.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	if env.Debug {
+		log.Info("BroadKick, Data=%v", v)
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	for _, s := range g.sessions {
+		if err = s.Kick(data); err != nil {
+			log.Error("Session kick error, ID=%d, UID=%d.", s.ID(), s.UID(), err)
+		}
+	}
+
+	// 清空
+	g.sessions = make(map[int64]*session.Session)
+
+	return err
+}
+
 // IsClosed 组是否关闭
 func (g *Group) IsClosed() bool {
 	return g.status.Load() == groupStatusClosed
